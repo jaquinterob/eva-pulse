@@ -8,6 +8,34 @@ if (!MONGODB_URI && process.env.NODE_ENV !== 'production') {
   )
 }
 
+// Configurar listeners de eventos de mongoose para mostrar logs
+let connectionLogged = false
+
+mongoose.connection.on('connected', () => {
+  if (!connectionLogged) {
+    const dbName = mongoose.connection.name
+    const host = mongoose.connection.host
+    const port = mongoose.connection.port
+    
+    console.log('✅ Base de datos MongoDB conectada exitosamente')
+    console.log(`   📊 Base de datos: ${dbName}`)
+    console.log(`   🔗 Host: ${host}:${port}`)
+    console.log(`   📡 Estado: Conectado`)
+    connectionLogged = true
+  }
+})
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ Error en la conexión a MongoDB:')
+  console.error(`   ${err.message}`)
+  connectionLogged = false
+})
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('⚠️  Base de datos MongoDB desconectada')
+  connectionLogged = false
+})
+
 interface MongooseCache {
   conn: typeof mongoose | null
   promise: Promise<typeof mongoose> | null
