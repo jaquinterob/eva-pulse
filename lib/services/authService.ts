@@ -52,7 +52,7 @@ export async function login(credentials: LoginCredentials): Promise<AuthResult> 
     const token = jwt.sign(
       { userId: user._id.toString(), username: user.username },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions
     )
 
     return {

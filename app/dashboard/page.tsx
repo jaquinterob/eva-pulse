@@ -6,16 +6,39 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import AuthGuard from '@/components/AuthGuard'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import { useState, useMemo, useRef, useEffect } from 'react'
-import {
-  getMockSessions,
-  getSessionsByDateRange,
-  getSessionsByUser,
-  getUniqueUsers,
-  getMockEvents,
-  getEventsBySession,
-  type MockSession,
-  type MockEvent
-} from '@/lib/mock-data/trackingData'
+
+// Tipos compatibles con los datos de la API
+interface TrackingSession {
+  sessionId: string
+  appUsername: string
+  startTime: Date
+  endTime: Date
+  duration: number
+  eventCount: number
+  deviceInfo: {
+    platform: string
+    language: string
+  }
+  isActive: boolean
+}
+
+interface TrackingEvent {
+  eventId: string
+  sessionId: string
+  appUsername: string
+  eventType: string
+  eventName: string
+  timestamp: Date
+  context: {
+    page?: string
+    component?: string
+    elementType?: string
+    route?: string
+    url?: string
+    elementId?: string
+  }
+  properties?: Record<string, any>
+}
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -52,9 +75,12 @@ export default function DashboardPage() {
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
 
   // Estado para el modal de timeline
-  const [selectedSessionForTimeline, setSelectedSessionForTimeline] = useState<MockSession | null>(null)
+  const [selectedSessionForTimeline, setSelectedSessionForTimeline] = useState<TrackingSession | null>(null)
 
-  const allUsers = getUniqueUsers()
+  // Estado para datos
+  const [allSessions, setAllSessions] = useState<TrackingSession[]>([])
+  const [allUsers, setAllUsers] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   function handleLogout() {
     logout()
@@ -70,17 +96,59 @@ export default function DashboardPage() {
     ).slice(0, 10) // Limitar a 10 resultados
   }, [searchQuery, allUsers])
 
+  // Cargar datos de la API
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true)
+      try {
+        // Cargar sesiones
+        const sessionsUrl = new URL('/api/tracking/sessions', window.location.origin)
+        sessionsUrl.searchParams.set('startDate', startDateObj.toISOString())
+        sessionsUrl.searchParams.set('endDate', endDateObj.toISOString())
+        if (selectedUser) {
+          sessionsUrl.searchParams.set('appUsername', selectedUser)
+        }
+
+        const sessionsResponse = await fetch(sessionsUrl.toString())
+        const sessionsData = await sessionsResponse.json()
+        if (sessionsData.success) {
+          setAllSessions(sessionsData.data.map((s: any) => ({
+            ...s,
+            startTime: new Date(s.startTime),
+            endTime: new Date(s.endTime),
+          })))
+        }
+
+        // Cargar usuarios únicos
+        const statsUrl = new URL('/api/tracking/stats', window.location.origin)
+        statsUrl.searchParams.set('startDate', startDateObj.toISOString())
+        statsUrl.searchParams.set('endDate', endDateObj.toISOString())
+        
+        const usersResponse = await fetch(statsUrl.toString())
+        const usersData = await usersResponse.json()
+        if (usersData.success) {
+          // Obtener usuarios únicos de las sesiones
+          const uniqueUsersSet = new Set<string>()
+          sessionsData.data.forEach((s: any) => uniqueUsersSet.add(s.appUsername))
+          setAllUsers(Array.from(uniqueUsersSet))
+        }
+      } catch (error) {
+        console.error('Error loading data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [startDateObj, endDateObj, selectedUser])
+
   // Filtrar sesiones según el rango de fechas y usuario seleccionado
   const filteredSessions = useMemo(() => {
-    let sessions = getSessionsByDateRange(startDateObj, endDateObj)
-    
-    // Si hay un usuario seleccionado, filtrar por ese usuario
-    if (selectedUser) {
-      sessions = sessions.filter(s => s.appUsername === selectedUser)
-    }
-    
-    return sessions
-  }, [startDateObj, endDateObj, selectedUser])
+    return allSessions.filter(s => {
+      const sessionDate = new Date(s.startTime)
+      return sessionDate >= startDateObj && sessionDate <= endDateObj
+    })
+  }, [allSessions, startDateObj, endDateObj])
 
   // Manejar selección de usuario
   const handleUserSelect = (username: string) => {
@@ -432,11 +500,7 @@ export default function DashboardPage() {
                           }}
                         >
                           {(() => {
-                            const start = new Date(startDate)
-                            const end = new Date(endDate)
-                            end.setHours(23, 59, 59, 999)
-                            const dateFiltered = getSessionsByDateRange(start, end)
-                            return dateFiltered.filter(s => s.appUsername === username).length
+                            return allSessions.filter((s: TrackingSession) => s.appUsername === username).length
                           })()} sesiones
                         </div>
                       </div>
@@ -724,15 +788,38 @@ function CompactMetricCard({ title, value, color }: {
 }
 
 function TimelineModal({ session, onClose, formatDate, formatDuration }: {
-  session: MockSession
+  session: TrackingSession
   onClose: () => void
   formatDate: (date: Date) => string
   formatDuration: (seconds: number) => string
 }) {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [hoveredEventId, setHoveredEventId] = useState<string | null>(null)
-  const allEvents = getMockEvents()
-  const sessionEvents = getEventsBySession(session.sessionId)
+  const [sessionEvents, setSessionEvents] = useState<TrackingEvent[]>([])
+  const [loadingEvents, setLoadingEvents] = useState(true)
+
+  // Cargar eventos de la sesión
+  useEffect(() => {
+    async function loadEvents() {
+      setLoadingEvents(true)
+      try {
+        const response = await fetch(`/api/tracking/events?sessionId=${session.sessionId}`)
+        const data = await response.json()
+        if (data.success) {
+          setSessionEvents(data.data.map((e: any) => ({
+            ...e,
+            timestamp: new Date(e.timestamp),
+          })))
+        }
+      } catch (error) {
+        console.error('Error loading events:', error)
+      } finally {
+        setLoadingEvents(false)
+      }
+    }
+
+    loadEvents()
+  }, [session.sessionId])
   
   const sortedEvents = useMemo(() => {
     return [...sessionEvents].sort((a, b) => 
@@ -742,8 +829,8 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
 
   // Agrupar eventos por sub-sesiones basadas en eventos de autenticación
   const groupedEvents = useMemo(() => {
-    const groups: Array<{ authEvent: MockEvent | null; events: MockEvent[] }> = []
-    let currentGroup: { authEvent: MockEvent | null; events: MockEvent[] } | null = null
+    const groups: Array<{ authEvent: TrackingEvent | null; events: TrackingEvent[] }> = []
+    let currentGroup: { authEvent: TrackingEvent | null; events: TrackingEvent[] } | null = null
 
     sortedEvents.forEach((event) => {
       if (event.eventType === 'authentication') {
@@ -994,7 +1081,7 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
               Timeline de Sesión
             </h2>
             <div style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-              {session.appUsername} • {formatSessionDate(session.startTime)} • {formatDuration(session.duration)} • {sessionEvents.length} eventos
+              {session.appUsername} • {formatSessionDate(session.startTime)} • {formatDuration(session.duration)} • {loadingEvents ? '...' : sessionEvents.length} eventos
             </div>
           </div>
           <button
@@ -1046,7 +1133,18 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
               borderRight: '1px solid var(--border)',
             }}
           >
-            {sortedEvents.length === 0 ? (
+            {loadingEvents ? (
+              <div
+                style={{
+                  padding: '4rem 2rem',
+                  textAlign: 'center',
+                  color: 'var(--muted-foreground)',
+                  fontSize: '1.125rem',
+                }}
+              >
+                Cargando eventos...
+              </div>
+            ) : sortedEvents.length === 0 ? (
               <div
                 style={{
                   padding: '4rem 2rem',
@@ -1458,7 +1556,7 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
 }
 
 function SessionCard({ session, formatDate, formatDuration, onClick }: {
-  session: MockSession
+  session: TrackingSession
   formatDate: (date: Date) => string
   formatDuration: (seconds: number) => string
   onClick: () => void

@@ -23,6 +23,9 @@ export interface MockEvent {
     page?: string
     component?: string
     elementType?: string
+    route?: string
+    url?: string
+    elementId?: string
   }
   properties?: Record<string, any>
 }
