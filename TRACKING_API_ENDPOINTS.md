@@ -13,7 +13,43 @@ Este documento describe todos los endpoints disponibles para que tu aplicación 
 
 ## 🔐 Autenticación
 
-Actualmente los endpoints no requieren autenticación para desarrollo. En producción se puede agregar autenticación por API key si es necesario.
+**TODOS los endpoints de tracking requieren autenticación con token JWT.**
+
+### Obtener Token
+
+Primero debes obtener un token JWT mediante el endpoint de login:
+
+**Endpoint:** `POST /api/auth/login`
+
+**Request Body:**
+```json
+{
+  "username": "dev",
+  "password": "dev"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "user_id",
+      "username": "dev"
+    }
+  }
+}
+```
+
+### Usar el Token
+
+Una vez obtenido el token, inclúyelo en el header `Authorization` de todas las peticiones:
+
+```
+Authorization: Bearer {tu_token_aqui}
+```
 
 ---
 
@@ -80,10 +116,27 @@ Inicia una nueva sesión de tracking cuando el usuario abre la aplicación.
 
 **Ejemplo de Uso (JavaScript):**
 ```javascript
+// Primero obtener el token
+const loginResponse = await fetch('http://localhost:3000/api/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    username: 'dev',
+    password: 'dev'
+  })
+})
+
+const loginData = await loginResponse.json()
+const token = loginData.data.token
+
+// Luego usar el token para iniciar sesión de tracking
 const response = await fetch('http://localhost:3000/api/tracking/session/start', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
   },
   body: JSON.stringify({
     sessionId: '550e8400-e29b-41d4-a716-446655440000',
@@ -102,6 +155,27 @@ const response = await fetch('http://localhost:3000/api/tracking/session/start',
 })
 
 const data = await response.json()
+```
+
+**Ejemplo de Uso (cURL para Postman):**
+```bash
+curl --location 'http://localhost:3000/api/tracking/session/start' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer {TU_TOKEN_AQUI}' \
+--data '{
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+    "appUsername": "dev",
+    "deviceInfo": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "platform": "Web",
+        "screenWidth": 1920,
+        "screenHeight": 1080,
+        "language": "es-ES"
+    },
+    "location": {
+        "timezone": "America/Bogota"
+    }
+}'
 ```
 
 ---
@@ -194,7 +268,10 @@ Envía un evento de comportamiento del usuario.
 ```javascript
 await fetch('http://localhost:3000/api/tracking/events', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}` // Token obtenido del login
+  },
   body: JSON.stringify({
     sessionId: sessionId,
     appUsername: 'dev',
@@ -216,7 +293,10 @@ await fetch('http://localhost:3000/api/tracking/events', {
 ```javascript
 await fetch('http://localhost:3000/api/tracking/events', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId: sessionId,
     appUsername: 'dev',
@@ -241,7 +321,10 @@ await fetch('http://localhost:3000/api/tracking/events', {
 ```javascript
 await fetch('http://localhost:3000/api/tracking/events', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId: sessionId,
     appUsername: 'dev',
@@ -263,7 +346,10 @@ await fetch('http://localhost:3000/api/tracking/events', {
 ```javascript
 await fetch('http://localhost:3000/api/tracking/events', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId: sessionId,
     appUsername: 'dev',
@@ -286,7 +372,10 @@ await fetch('http://localhost:3000/api/tracking/events', {
 ```javascript
 await fetch('http://localhost:3000/api/tracking/events', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId: sessionId,
     appUsername: 'dev',
@@ -314,7 +403,10 @@ await fetch('http://localhost:3000/api/tracking/events', {
 ```javascript
 await fetch('http://localhost:3000/api/tracking/events', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId: sessionId,
     appUsername: 'dev',
@@ -336,7 +428,10 @@ await fetch('http://localhost:3000/api/tracking/events', {
 ```javascript
 await fetch('http://localhost:3000/api/tracking/events', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId: sessionId,
     appUsername: 'dev',
@@ -402,12 +497,13 @@ Marca el fin de una sesión cuando el usuario cierra la aplicación.
 }
 ```
 
-**Ejemplo de Uso:**
+**Ejemplo de Uso (JavaScript):**
 ```javascript
 const response = await fetch('http://localhost:3000/api/tracking/session/end', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}` // Token obtenido del login
   },
   body: JSON.stringify({
     sessionId: sessionId,
@@ -418,19 +514,51 @@ const response = await fetch('http://localhost:3000/api/tracking/session/end', {
 const data = await response.json()
 ```
 
+**Ejemplo de Uso (cURL para Postman):**
+```bash
+curl --location 'http://localhost:3000/api/tracking/session/end' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer {TU_TOKEN_AQUI}' \
+--data '{
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+    "appUsername": "dev"
+}'
+```
+
 ---
 
 ## 🔄 Flujo Completo de Uso
 
+### Paso 0: Obtener Token de Autenticación
+```javascript
+// Al iniciar la aplicación, obtener el token JWT
+const loginResponse = await fetch('http://localhost:3000/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    username: 'dev',
+    password: 'dev'
+  })
+})
+
+const loginData = await loginResponse.json()
+const token = loginData.data.token
+localStorage.setItem('eva_pulse_token', token)
+```
+
 ### Paso 1: Iniciar Sesión
 ```javascript
 // Al abrir la app
+const token = localStorage.getItem('eva_pulse_token')
 const sessionId = generateUUID()
 localStorage.setItem('eva_pulse_session_id', sessionId)
 
 await fetch('/api/tracking/session/start', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId,
     appUsername: 'dev',
@@ -443,9 +571,13 @@ await fetch('/api/tracking/session/start', {
 ### Paso 2: Enviar Eventos (múltiples veces durante la sesión)
 ```javascript
 // Cada vez que ocurre una acción
+const token = localStorage.getItem('eva_pulse_token')
 await fetch('/api/tracking/events', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId,
     appUsername: 'dev',
@@ -460,9 +592,13 @@ await fetch('/api/tracking/events', {
 ### Paso 3: Finalizar Sesión
 ```javascript
 // Al cerrar la app o cerrar sesión
+const token = localStorage.getItem('eva_pulse_token')
 await fetch('/api/tracking/session/end', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
   body: JSON.stringify({
     sessionId,
     appUsername: 'dev'
@@ -506,67 +642,85 @@ localStorage.removeItem('eva_pulse_session_id')
 
 ### Usando cURL
 
+**Nota:** Reemplaza `{TU_TOKEN_AQUI}` con el token obtenido del endpoint `/api/auth/login`
+
+#### Obtener Token
+```bash
+curl --location 'http://localhost:3000/api/auth/login' \
+--header 'Content-Type: application/json' \
+--data '{
+    "username": "dev",
+    "password": "dev"
+}'
+```
+
 #### Iniciar Sesión
 ```bash
-curl -X POST http://localhost:3000/api/tracking/session/start \
-  -H "Content-Type: application/json" \
-  -d '{
+curl --location 'http://localhost:3000/api/tracking/session/start' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer {TU_TOKEN_AQUI}' \
+--data '{
     "sessionId": "test-session-123",
     "appUsername": "dev",
     "deviceInfo": {
-      "userAgent": "Mozilla/5.0",
-      "platform": "Web",
-      "screenWidth": 1920,
-      "screenHeight": 1080,
-      "language": "es-ES"
+        "userAgent": "Mozilla/5.0",
+        "platform": "Web",
+        "screenWidth": 1920,
+        "screenHeight": 1080,
+        "language": "es-ES"
     },
     "location": {
-      "timezone": "America/Bogota"
+        "timezone": "America/Bogota"
     }
-  }'
+}'
 ```
 
 #### Enviar Evento
 ```bash
-curl -X POST http://localhost:3000/api/tracking/events \
-  -H "Content-Type: application/json" \
-  -d '{
+curl --location 'http://localhost:3000/api/tracking/events' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer {TU_TOKEN_AQUI}' \
+--data '{
     "sessionId": "test-session-123",
     "appUsername": "dev",
     "eventType": "interaction",
     "eventName": "button_click",
     "context": {
-      "page": "dashboard",
-      "component": "SearchButton",
-      "elementType": "button"
+        "page": "dashboard",
+        "component": "SearchButton",
+        "elementType": "button"
     },
     "properties": {
-      "buttonText": "Buscar"
+        "buttonText": "Buscar"
     }
-  }'
+}'
 ```
 
 #### Finalizar Sesión
 ```bash
-curl -X POST http://localhost:3000/api/tracking/session/end \
-  -H "Content-Type: application/json" \
-  -d '{
+curl --location 'http://localhost:3000/api/tracking/session/end' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer {TU_TOKEN_AQUI}' \
+--data '{
     "sessionId": "test-session-123",
     "appUsername": "dev"
-  }'
+}'
 ```
 
 ---
 
 ## 📝 Notas Importantes
 
-1. **Usuario de desarrollo**: Usa `"dev"` como `appUsername` durante desarrollo
-2. **Session ID**: Debe persistir durante toda la sesión del usuario
-3. **Timestamp**: Opcional en eventos, el servidor lo genera automáticamente
-4. **Errores**: El tracking nunca debe interrumpir tu aplicación
-5. **Performance**: Los eventos se envían de forma asíncrona
-6. **Validación**: El servidor valida todos los campos requeridos
-7. **Rate Limiting**: En producción se puede implementar rate limiting si es necesario
+1. **Autenticación**: TODOS los endpoints requieren un token JWT válido en el header `Authorization: Bearer {token}`
+2. **Obtener Token**: Usa el endpoint `/api/auth/login` con credenciales `dev/dev` para obtener el token
+3. **Usuario de desarrollo**: Usa `"dev"` como `appUsername` durante desarrollo
+4. **Session ID**: Debe persistir durante toda la sesión del usuario
+5. **Timestamp**: Opcional en eventos, el servidor lo genera automáticamente
+6. **Errores**: El tracking nunca debe interrumpir tu aplicación
+7. **Performance**: Los eventos se envían de forma asíncrona
+8. **Validación**: El servidor valida todos los campos requeridos
+9. **Rate Limiting**: En producción se puede implementar rate limiting si es necesario
+10. **Token Expiración**: Los tokens JWT tienen una expiración, renueva el token si recibes un error 401
 
 ---
 
