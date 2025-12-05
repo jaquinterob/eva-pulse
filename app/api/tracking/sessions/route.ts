@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuth, unauthorizedResponse } from '@/lib/middleware/auth'
 import {
   getSessionsByDateRange,
   getSessionsByUser,
@@ -8,6 +9,11 @@ import {
 } from '@/lib/services/trackingService'
 
 export async function GET(request: NextRequest) {
+  // Verificar autenticación
+  const user = verifyAuth(request)
+  if (!user) {
+    return unauthorizedResponse()
+  }
   try {
     const searchParams = request.nextUrl.searchParams
     const startDate = searchParams.get('startDate')

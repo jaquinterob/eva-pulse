@@ -101,6 +101,21 @@ export default function DashboardPage() {
     async function loadData() {
       setLoading(true)
       try {
+        // Obtener token del localStorage
+        const authData = localStorage.getItem('eva-pulse-auth')
+        const token = authData ? JSON.parse(authData).token : null
+
+        if (!token) {
+          console.error('No hay token de autenticación')
+          setLoading(false)
+          return
+        }
+
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        }
+
         // Cargar sesiones
         const sessionsUrl = new URL('/api/tracking/sessions', window.location.origin)
         sessionsUrl.searchParams.set('startDate', startDateObj.toISOString())
@@ -109,7 +124,7 @@ export default function DashboardPage() {
           sessionsUrl.searchParams.set('appUsername', selectedUser)
         }
 
-        const sessionsResponse = await fetch(sessionsUrl.toString())
+        const sessionsResponse = await fetch(sessionsUrl.toString(), { headers })
         const sessionsData = await sessionsResponse.json()
         if (sessionsData.success) {
           setAllSessions(sessionsData.data.map((s: any) => ({
@@ -124,7 +139,7 @@ export default function DashboardPage() {
         statsUrl.searchParams.set('startDate', startDateObj.toISOString())
         statsUrl.searchParams.set('endDate', endDateObj.toISOString())
         
-        const usersResponse = await fetch(statsUrl.toString())
+        const usersResponse = await fetch(statsUrl.toString(), { headers })
         const usersData = await usersResponse.json()
         if (usersData.success) {
           // Obtener usuarios únicos de las sesiones
@@ -803,7 +818,21 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
     async function loadEvents() {
       setLoadingEvents(true)
       try {
-        const response = await fetch(`/api/tracking/events?sessionId=${session.sessionId}`)
+        // Obtener token del localStorage
+        const authData = localStorage.getItem('eva-pulse-auth')
+        const token = authData ? JSON.parse(authData).token : null
+
+        if (!token) {
+          console.error('No hay token de autenticación')
+          setLoadingEvents(false)
+          return
+        }
+
+        const response = await fetch(`/api/tracking/events?sessionId=${session.sessionId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
         const data = await response.json()
         if (data.success) {
           setSessionEvents(data.data.map((e: any) => ({

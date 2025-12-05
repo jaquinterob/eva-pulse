@@ -176,3 +176,115 @@ export async function getEventsByType(
   return events.map(convertEvent)
 }
 
+// Crear nueva sesión
+export async function createSession(data: {
+  sessionId: string
+  appUsername: string
+  deviceInfo: {
+    userAgent?: string
+    platform: string
+    screenWidth?: number
+    screenHeight?: number
+    language: string
+  }
+  location?: {
+    timezone?: string
+    country?: string
+  }
+}): Promise<ISession> {
+  await connectDB()
+  
+  const session = new Session({
+    sessionId: data.sessionId,
+    appUsername: data.appUsername,
+    startTime: new Date(),
+    duration: 0,
+    eventCount: 0,
+    deviceInfo: data.deviceInfo,
+    location: data.location,
+    isActive: true,
+  })
+
+  await session.save()
+  return session
+}
+
+// Finalizar sesión
+export async function endSession(
+  sessionId: string,
+  appUsername: string
+): Promise<ISession | null> {
+  await connectDB()
+  
+  const session = await Session.findOne({ sessionId, appUsername })
+  if (!session) {
+    return null
+  }
+
+  const endTime = new Date()
+  const duration = Math.floor((endTime.getTime() - session.startTime.getTime()) / 1000)
+  
+  session.endTime = endTime
+  session.duration = duration
+  session.isActive = false
+  
+  await session.save()
+  return session
+}
+
+// Crear evento
+export async function createEvent(data: {
+  sessionId: string
+  appUsername: string
+  eventType: 'authentication' | 'interaction' | 'event' | 'navigation' | 'error'
+  eventName: string
+  context?: {
+    page?: string
+    component?: string
+    elementId?: string
+    elementType?: string
+    url?: string
+    route?: string
+  }
+  properties?: Record<string, any>
+  metadata?: {
+    duration?: number
+    value?: string | number
+    previousValue?: any
+    error?: string
+    success?: boolean
+  }
+  timestamp?: Date
+}): Promise<IEvent> {
+  await connectDB()
+  
+  // Verificar que la sesión existe
+  const session = await Session.findOne({ sessionId: data.sessionId })
+  if (!session) {
+    throw new Error('Sesión no encontrada')
+  }
+
+  // Generar eventId único
+  const eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  
+  const event = new Event({
+    eventId,
+    sessionId: data.sessionId,
+    appUsername: data.appUsername,
+    eventType: data.eventType,
+    eventName: data.eventName,
+    timestamp: data.timestamp || new Date(),
+    context: data.context || {},
+    properties: data.properties || {},
+    metadata: data.metadata,
+  })
+
+  await event.save()
+
+  // Actualizar contador de eventos en la sesión
+  session.eventCount = (session.eventCount || 0) + 1
+  await session.save()
+
+  return event
+}
+
