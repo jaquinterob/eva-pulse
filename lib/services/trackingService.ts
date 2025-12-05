@@ -35,39 +35,39 @@ export interface TrackingEvent {
   properties?: Record<string, any>
 }
 
-// Convertir ISession a TrackingSession
-function convertSession(session: ISession): TrackingSession {
+// Convertir objeto plano de sesión a TrackingSession
+function convertSession(session: any): TrackingSession {
   return {
     sessionId: session.sessionId,
     appUsername: session.appUsername,
-    startTime: session.startTime,
-    endTime: session.endTime || new Date(),
+    startTime: new Date(session.startTime),
+    endTime: session.endTime ? new Date(session.endTime) : new Date(),
     duration: session.duration,
     eventCount: session.eventCount,
     deviceInfo: {
-      platform: session.deviceInfo.platform,
-      language: session.deviceInfo.language,
+      platform: session.deviceInfo?.platform || 'Unknown',
+      language: session.deviceInfo?.language || 'es-ES',
     },
     isActive: session.isActive,
   }
 }
 
-// Convertir IEvent a TrackingEvent
-function convertEvent(event: IEvent): TrackingEvent {
+// Convertir objeto plano de evento a TrackingEvent
+function convertEvent(event: any): TrackingEvent {
   return {
     eventId: event.eventId,
     sessionId: event.sessionId,
     appUsername: event.appUsername,
     eventType: event.eventType,
     eventName: event.eventName,
-    timestamp: event.timestamp,
+    timestamp: new Date(event.timestamp),
     context: {
-      page: event.context.page,
-      component: event.context.component,
-      elementType: event.context.elementType,
-      route: event.context.route,
-      url: event.context.url,
-      elementId: event.context.elementId,
+      page: event.context?.page,
+      component: event.context?.component,
+      elementType: event.context?.elementType,
+      route: event.context?.route,
+      url: event.context?.url,
+      elementId: event.context?.elementId,
     },
     properties: event.properties || {},
   }
