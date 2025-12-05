@@ -7,8 +7,6 @@ interface DatabaseStatusResponse {
   connected: boolean
   message: string
   timestamp: string
-  collections?: string[]
-  collectionsCount?: number
 }
 
 export default function DatabaseStatus() {
@@ -70,60 +68,36 @@ export default function DatabaseStatus() {
   }
 
   const isConnected = status?.connected ?? false
-  const collectionsCount = status?.collectionsCount ?? 0
 
   return (
     <div
       style={{
+        padding: '0.75rem 1.5rem',
+        background: isConnected 
+          ? 'rgba(34, 197, 94, 0.2)' 
+          : 'rgba(239, 68, 68, 0.2)',
+        borderRadius: '8px',
+        border: `1px solid ${isConnected ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
+        color: 'var(--primary-foreground)',
         display: 'flex',
-        flexDirection: 'column',
-        gap: '0.5rem',
         alignItems: 'center',
+        gap: '0.5rem',
+        fontWeight: 500,
       }}
     >
-      <div
+      <span
         style={{
-          padding: '0.75rem 1.5rem',
-          background: isConnected 
-            ? 'rgba(34, 197, 94, 0.2)' 
-            : 'rgba(239, 68, 68, 0.2)',
-          borderRadius: '8px',
-          border: `1px solid ${isConnected ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
-          color: 'var(--primary-foreground)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          fontWeight: 500,
+          display: 'inline-block',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          background: isConnected ? '#22c55e' : '#ef4444',
+          boxShadow: isConnected 
+            ? '0 0 8px rgba(34, 197, 94, 0.6)' 
+            : '0 0 8px rgba(239, 68, 68, 0.6)',
         }}
-      >
-        <span
-          style={{
-            display: 'inline-block',
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            background: isConnected ? '#22c55e' : '#ef4444',
-            boxShadow: isConnected 
-              ? '0 0 8px rgba(34, 197, 94, 0.6)' 
-              : '0 0 8px rgba(239, 68, 68, 0.6)',
-          }}
-        />
-        {isConnected ? '✓ Base de datos conectada' : '✗ Base de datos desconectada'}
-      </div>
-      {isConnected && (
-        <div
-          style={{
-            fontSize: '0.875rem',
-            opacity: 0.8,
-            color: 'var(--primary-foreground)',
-          }}
-        >
-          {collectionsCount > 0 
-            ? `${collectionsCount} colección${collectionsCount > 1 ? 'es' : ''} disponible${collectionsCount > 1 ? 's' : ''}`
-            : 'Base de datos vacía (sin colecciones)'
-          }
-        </div>
-      )}
+      />
+      {isConnected ? '✓ Base de datos conectada' : '✗ Base de datos desconectada'}
     </div>
   )
 }
