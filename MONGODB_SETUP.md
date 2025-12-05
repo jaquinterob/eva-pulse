@@ -274,3 +274,4 @@ db.dropDatabase()
 - **Docker**: Los datos persisten en el volumen `mongodb_data`
 - **Homebrew**: Los datos están en `/usr/local/var/mongodb`
 
+

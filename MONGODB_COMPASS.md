@@ -64,3 +64,4 @@ Cuando empieces a crear modelos, verás colecciones como:
 - La base de datos se crea automáticamente cuando insertas el primer documento
 - Si no hay datos, la base de datos puede no aparecer hasta que haya contenido
 
+

@@ -157,3 +157,4 @@ pm2 startup
 - Funciona igual en desarrollo y producción
 - Solo necesitas configurar `MONGODB_URI` en el `.env` del servidor
 
+

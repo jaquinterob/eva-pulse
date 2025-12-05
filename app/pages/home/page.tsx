@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: 'Inicio - Eva Pulse',
 }
 
-export default function Home() {
+export default function HomePage() {
   return (
     <main
       style={{
