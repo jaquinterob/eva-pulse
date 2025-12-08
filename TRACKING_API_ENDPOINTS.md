@@ -71,7 +71,8 @@ Inicia una nueva sesión de tracking cuando el usuario abre la aplicación.
     "platform": "Web",
     "screenWidth": 1920,
     "screenHeight": 1080,
-    "language": "es-ES"
+    "language": "es-ES",
+    "releaseDate": "2024-01-15"
   },
   "location": {
     "timezone": "America/Bogota"
@@ -88,6 +89,7 @@ Inicia una nueva sesión de tracking cuando el usuario abre la aplicación.
   - `screenWidth` (number, opcional): Ancho de pantalla en píxeles
   - `screenHeight` (number, opcional): Alto de pantalla en píxeles
   - `language` (string): Idioma del dispositivo (ej: "es-ES")
+  - `releaseDate` (string, opcional): Fecha de lanzamiento de la app (formato ISO: "YYYY-MM-DD")
 
 **Campos Opcionales:**
 - `location` (object): Información de ubicación
@@ -146,7 +148,8 @@ const response = await fetch('http://localhost:3000/api/tracking/session/start',
       platform: navigator.platform || 'Web',
       screenWidth: window.screen?.width,
       screenHeight: window.screen?.height,
-      language: navigator.language || 'es-ES'
+      language: navigator.language || 'es-ES',
+      releaseDate: '2024-01-15' // Fecha de lanzamiento de tu app
     },
     location: {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -170,7 +173,8 @@ curl --location 'http://localhost:3000/api/tracking/session/start' \
         "platform": "Web",
         "screenWidth": 1920,
         "screenHeight": 1080,
-        "language": "es-ES"
+        "language": "es-ES",
+        "releaseDate": "2024-01-15"
     },
     "location": {
         "timezone": "America/Bogota"
@@ -667,7 +671,8 @@ curl --location 'http://localhost:3000/api/tracking/session/start' \
         "platform": "Web",
         "screenWidth": 1920,
         "screenHeight": 1080,
-        "language": "es-ES"
+        "language": "es-ES",
+        "releaseDate": "2024-01-15"
     },
     "location": {
         "timezone": "America/Bogota"

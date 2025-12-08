@@ -13,6 +13,7 @@ export interface ISession extends Document {
     screenWidth?: number
     screenHeight?: number
     language: string
+    releaseDate?: string
   }
   location?: {
     timezone?: string
@@ -67,6 +68,7 @@ const SessionSchema = new Schema<ISession>(
         type: String,
         required: true,
       },
+      releaseDate: String,
     },
     location: {
       timezone: String,

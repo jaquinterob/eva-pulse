@@ -247,6 +247,16 @@ export default function DashboardPage() {
 
   return (
     <AuthGuard>
+      <style dangerouslySetInnerHTML={{__html: `
+        .datetime-input::-webkit-calendar-picker-indicator {
+          display: none !important;
+          -webkit-appearance: none;
+        }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+          display: none !important;
+          -webkit-appearance: none;
+        }
+      `}} />
       <main
         style={{
           minHeight: '100vh',
@@ -418,7 +428,7 @@ export default function DashboardPage() {
                   placeholder="Escribe al menos 2 letras para buscar..."
                   style={{
                     width: '100%',
-                    minWidth: '250px',
+                    minWidth: '295px',
                     padding: '0.75rem 1rem',
                     paddingRight: selectedUser ? '2.5rem' : '1rem',
                     border: '1px solid var(--border)',
@@ -557,6 +567,7 @@ export default function DashboardPage() {
                       minWidth: '200px',
                       width: '100%',
                     }}
+                    className="datetime-input"
                   />
                   <svg
                     width="16"
@@ -613,6 +624,7 @@ export default function DashboardPage() {
                       minWidth: '200px',
                       width: '100%',
                     }}
+                    className="datetime-input"
                   />
                   <svg
                     width="16"

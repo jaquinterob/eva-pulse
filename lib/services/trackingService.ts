@@ -188,6 +188,7 @@ export async function createSession(data: {
     screenWidth?: number
     screenHeight?: number
     language: string
+    releaseDate?: string
   }
   location?: {
     timezone?: string

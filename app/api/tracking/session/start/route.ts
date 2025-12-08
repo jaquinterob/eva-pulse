@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         screenWidth: body.deviceInfo.screenWidth,
         screenHeight: body.deviceInfo.screenHeight,
         language: body.deviceInfo.language,
+        releaseDate: body.deviceInfo.releaseDate,
       },
       location: body.location,
     })
