@@ -856,24 +856,38 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
     )
   }, [sessionEvents])
 
+  // Función para verificar si un evento de autenticación es un login
+  const isLoginEventCheck = (event: TrackingEvent | null): boolean => {
+    if (!event || event.eventType !== 'authentication') return false
+    const eventName = event.eventName.toLowerCase()
+    return eventName.includes('login') || eventName === 'authenticated' || eventName === 'signin'
+  }
+
   // Agrupar eventos por sub-sesiones basadas en eventos de autenticación
   const groupedEvents = useMemo(() => {
     const groups: Array<{ authEvent: TrackingEvent | null; events: TrackingEvent[] }> = []
     let currentGroup: { authEvent: TrackingEvent | null; events: TrackingEvent[] } | null = null
 
+    // Función para determinar si un evento de autenticación es un login
+    const isLoginEvent = (event: TrackingEvent): boolean => {
+      if (event.eventType !== 'authentication') return false
+      const eventName = event.eventName.toLowerCase()
+      return eventName.includes('login') || eventName === 'authenticated' || eventName === 'signin'
+    }
+
     sortedEvents.forEach((event) => {
-      if (event.eventType === 'authentication') {
+      if (event.eventType === 'authentication' && isLoginEvent(event)) {
         // Si ya hay un grupo, guardarlo
         if (currentGroup) {
           groups.push(currentGroup)
         }
-        // Crear nuevo grupo con este evento de autenticación
+        // Crear nuevo grupo con este evento de login
         currentGroup = {
           authEvent: event,
           events: [event]
         }
       } else {
-        // Si no hay grupo actual, crear uno sin evento de autenticación
+        // Cualquier otro evento (incluyendo logout): agregar al grupo actual
         if (!currentGroup) {
           currentGroup = {
             authEvent: null,
@@ -1201,63 +1215,66 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
                 />
 
                 {/* Grupos de eventos por sub-sesión */}
-                {groupedEvents.map((group, groupIndex) => (
-                  <div key={groupIndex}>
-                    {/* Separador de sub-sesión si hay evento de autenticación */}
-                    {group.authEvent && (
-                      <div
-                        style={{
-                          position: 'relative',
-                          marginBottom: '1.5rem',
-                          marginTop: groupIndex > 0 ? '2rem' : '0',
-                          paddingTop: groupIndex > 0 ? '1.5rem' : '0',
-                          borderTop: groupIndex > 0 ? '2px solid var(--border)' : 'none',
-                        }}
-                      >
-                        {/* Línea horizontal separadora */}
-                        {groupIndex > 0 && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: '-3rem',
-                              top: '-2px',
-                              width: '3rem',
-                              height: '2px',
-                              background: 'var(--border)',
-                            }}
-                          />
-                        )}
-                        {/* Encabezado de sub-sesión */}
+                {groupedEvents.map((group, groupIndex) => {
+                  const showNewSessionHeader = group.authEvent && isLoginEventCheck(group.authEvent)
+
+                  return (
+                    <div key={groupIndex}>
+                      {/* Separador de sub-sesión solo si hay evento de login (no logout) */}
+                      {showNewSessionHeader && (
                         <div
                           style={{
-                            marginBottom: '1rem',
-                            paddingLeft: '1.5rem',
+                            position: 'relative',
+                            marginBottom: '1.5rem',
+                            marginTop: groupIndex > 0 ? '2rem' : '0',
+                            paddingTop: groupIndex > 0 ? '1.5rem' : '0',
+                            borderTop: groupIndex > 0 ? '2px solid var(--border)' : 'none',
                           }}
                         >
+                          {/* Línea horizontal separadora */}
+                          {groupIndex > 0 && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: '-3rem',
+                                top: '-2px',
+                                width: '3rem',
+                                height: '2px',
+                                background: 'var(--border)',
+                              }}
+                            />
+                          )}
+                          {/* Encabezado de sub-sesión */}
                           <div
                             style={{
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              color: 'var(--muted-foreground)',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
-                              marginBottom: '0.5rem',
+                              marginBottom: '1rem',
+                              paddingLeft: '1.5rem',
                             }}
                           >
-                            Nueva Sesión
-                          </div>
-                          <div
-                            style={{
-                              fontSize: '0.875rem',
-                              color: 'var(--foreground)',
-                              fontWeight: 500,
-                            }}
-                          >
-                            {formatSessionDate(group.authEvent.timestamp)}
+                            <div
+                              style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                color: 'var(--muted-foreground)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '0.5rem',
+                              }}
+                            >
+                              Nueva Sesión
+                            </div>
+                            <div
+                              style={{
+                                fontSize: '0.875rem',
+                                color: 'var(--foreground)',
+                                fontWeight: 500,
+                              }}
+                            >
+                              {formatSessionDate(group.authEvent!.timestamp)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Eventos del grupo */}
                     {group.events.map((event) => {
@@ -1307,7 +1324,7 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
                               alignItems: 'center',
                               gap: '0.5rem',
                               paddingTop: '0.1em',
-                              marginLeft: '-0.5 rem',
+                              marginLeft: '-0.5rem',
                             }}
                           >
                             <div
@@ -1353,7 +1370,8 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
                       )
                     })}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -1590,6 +1608,43 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
   formatDuration: (seconds: number) => string
   onClick: () => void
 }) {
+  // Función para obtener el icono y nombre del SO
+  const getPlatformInfo = (platform: string) => {
+    const platformLower = platform.toLowerCase()
+    if (platformLower.includes('android')) {
+      return {
+        name: 'Android',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993 0 .5511-.4483.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.2439 13.8533 7.8508 12 7.8508s-3.5902.3931-5.1349 1.0853L4.8428 5.4332a.4161.4161 0 00-.5676-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.186.8535 12.3104.8535 13.8218c0 .2915.1575.5734.4126.7188.255.146.5698.1899.8568.1031l.4955-.1242c.8135-.2038 1.6568-.2038 2.4703 0 .8135.2038 1.6568.2038 2.4703 0 .8135-.2038 1.6568-.2038 2.4703 0 .8135.2038 1.6568.2038 2.4703 0 .8135-.2038 1.6568-.2038 2.4703 0l.4955.1242c.287.0868.6018.0429.8568-.1031.255-.1454.4126-.4273.4126-.7188 0-1.5114-1.8354-2.6358-4.1382-3.4894z"/>
+          </svg>
+        )
+      }
+    } else if (platformLower.includes('ios') || platformLower.includes('iphone') || platformLower.includes('ipad')) {
+      return {
+        name: 'iOS',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+          </svg>
+        )
+      }
+    } else {
+      return {
+        name: platform || 'Unknown',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        )
+      }
+    }
+  }
+
+  const platformInfo = getPlatformInfo(session.deviceInfo?.platform || '')
+
   return (
     <div
       style={{
@@ -1660,9 +1715,17 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
                 style={{
                   fontSize: '0.8125rem',
                   color: 'var(--muted-foreground)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
                 }}
               >
-                {formatDate(session.startTime)}
+                <span>{formatDate(session.startTime)}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  {platformInfo.icon}
+                  <span>{platformInfo.name}</span>
+                </span>
               </div>
             </div>
           </div>

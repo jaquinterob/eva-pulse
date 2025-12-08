@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const session = await endSession(body.sessionId, body.appUsername)
+    // Usar el username enviado desde el cliente
+    const appUsername = body.appUsername.trim()
+
+    const session = await endSession(body.sessionId, appUsername)
 
     if (!session) {
       return NextResponse.json(

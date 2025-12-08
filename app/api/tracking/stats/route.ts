@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth, unauthorizedResponse } from '@/lib/middleware/auth'
-import { getUniqueUsers, getTotalSessions, getTotalEvents, getSessionsByDateRange } from '@/lib/services/trackingService'
+import { getUniqueUsers, getTotalSessions, getTotalEvents, getSessionsByDateRange, getSessionsByUser } from '@/lib/services/trackingService'
 
 export async function GET(request: NextRequest) {
   // Verificar autenticación
@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const appUsername = searchParams.get('appUsername')
 
     if (startDate && endDate) {
       // Si hay filtros de fecha, calcular stats para ese rango
@@ -19,14 +20,40 @@ export async function GET(request: NextRequest) {
         new Date(startDate),
         new Date(endDate)
       )
-      const uniqueUsersSet = new Set(sessions.map(s => s.appUsername))
+      
+      // Si se especifica appUsername, filtrar por él
+      const filteredSessions = appUsername 
+        ? sessions.filter(s => s.appUsername === appUsername)
+        : sessions
+      
+      const uniqueUsersSet = new Set(filteredSessions.map(s => s.appUsername))
 
       return NextResponse.json({
         success: true,
         data: {
           uniqueUsers: uniqueUsersSet.size,
-          totalSessions: sessions.length,
-          totalEvents: sessions.reduce((sum, s) => sum + s.eventCount, 0),
+          totalSessions: filteredSessions.length,
+          totalEvents: filteredSessions.reduce((sum, s) => sum + s.eventCount, 0),
+        },
+      })
+    }
+
+    // Sin filtros de fecha
+    if (appUsername) {
+      // Stats de un usuario específico
+      const userSessions = await getSessionsByUser(appUsername)
+      const Event = (await import('@/lib/models/Event')).default
+      const { connectDB } = await import('@/lib/db/connection')
+      await connectDB()
+      
+      const totalEvents = await Event.countDocuments({ appUsername })
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          uniqueUsers: 1,
+          totalSessions: userSessions.length,
+          totalEvents,
         },
       })
     }

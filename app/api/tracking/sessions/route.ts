@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         new Date(endDate)
       )
 
+      // Si se especifica appUsername, filtrar por él
       if (appUsername) {
         const filtered = sessions.filter((s) => s.appUsername === appUsername)
         return NextResponse.json({ success: true, data: filtered })
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (appUsername) {
+      // Buscar sesiones por appUsername
       const sessions = await getSessionsByUser(appUsername)
       return NextResponse.json({ success: true, data: sessions })
     }

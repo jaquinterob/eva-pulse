@@ -25,6 +25,11 @@ export async function GET(request: NextRequest) {
 
     if (sessionId) {
       const events = await getEventsBySession(sessionId)
+      // Si se especifica appUsername, filtrar por él
+      if (appUsername) {
+        const filtered = events.filter((e) => e.appUsername === appUsername)
+        return NextResponse.json({ success: true, data: filtered })
+      }
       return NextResponse.json({ success: true, data: events })
     }
 
@@ -38,11 +43,21 @@ export async function GET(request: NextRequest) {
         new Date(startDate),
         new Date(endDate)
       )
+      // Si se especifica appUsername, filtrar por él
+      if (appUsername) {
+        const filtered = events.filter((e) => e.appUsername === appUsername)
+        return NextResponse.json({ success: true, data: filtered })
+      }
       return NextResponse.json({ success: true, data: events })
     }
 
     if (eventType) {
       const events = await getEventsByType(eventType)
+      // Si se especifica appUsername, filtrar por él
+      if (appUsername) {
+        const filtered = events.filter((e) => e.appUsername === appUsername)
+        return NextResponse.json({ success: true, data: filtered })
+      }
       return NextResponse.json({ success: true, data: events })
     }
 
@@ -94,9 +109,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Usar el username enviado desde el cliente
+    const appUsername = body.appUsername.trim()
+
     const event = await createEvent({
       sessionId: body.sessionId,
-      appUsername: body.appUsername,
+      appUsername: appUsername,
       eventType: body.eventType,
       eventName: body.eventName,
       context: body.context,

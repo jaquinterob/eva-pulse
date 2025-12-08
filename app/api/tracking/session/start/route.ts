@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Usar el username enviado desde el cliente
+    const appUsername = body.appUsername.trim()
+
     // Verificar que no exista una sesión activa con el mismo sessionId
     const { getSessionsByUser } = await import('@/lib/services/trackingService')
     const { connectDB } = await import('@/lib/db/connection')
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     const session = await createSession({
       sessionId: body.sessionId,
-      appUsername: body.appUsername,
+      appUsername: appUsername,
       deviceInfo: {
         userAgent: body.deviceInfo.userAgent,
         platform: body.deviceInfo.platform,

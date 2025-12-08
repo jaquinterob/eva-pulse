@@ -1,6 +1,7 @@
 import { connectDB } from '@/lib/db/connection'
 import Session, { type ISession } from '@/lib/models/Session'
 import Event, { type IEvent } from '@/lib/models/Event'
+import User from '@/lib/models/User'
 
 // Tipos compatibles con los mocks
 export interface TrackingSession {
@@ -125,6 +126,7 @@ export async function getEventsByUser(
 
 export async function getUniqueUsers(): Promise<string[]> {
   await connectDB()
+  // Obtener los appUsername distintos de las sesiones
   const users = await Session.distinct('appUsername')
   return users
 }
