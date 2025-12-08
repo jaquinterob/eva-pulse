@@ -50,24 +50,37 @@ export const themeConfig: ThemeConfig = {
     destructiveForeground: '#ffffff',
   },
   dark: {
-    background: '#081420',
-    foreground: '#fafafa',
-    primary: '#764ba2',
+    // Background principal - más claro para mejor contraste
+    background: '#0f172a',
+    // Foreground - blanco puro para máximo contraste
+    foreground: '#ffffff',
+    // Primary - más vibrante y visible
+    primary: '#8b5cf6',
     primaryForeground: '#ffffff',
-    secondary: '#0f1f3a',
+    // Secondary - más claro y visible
+    secondary: '#1e293b',
     secondaryForeground: '#f1f5f9',
-    muted: '#0f1f3a',
-    mutedForeground: '#94a3b8',
-    accent: '#0f1f3a',
-    accentForeground: '#f1f5f9',
-    border: '#152a47',
-    input: '#152a47',
-    ring: '#764ba2',
-    card: '#0f1f3a',
-    cardForeground: '#fafafa',
-    popover: '#0f1f3a',
-    popoverForeground: '#fafafa',
-    destructive: '#7f1d1d',
+    // Muted - más claro para mejor contraste con background
+    muted: '#1e293b',
+    // Muted foreground - más claro para legibilidad (WCAG AA)
+    mutedForeground: '#cbd5e1',
+    // Accent - más vibrante y diferenciado
+    accent: '#a855f7',
+    accentForeground: '#ffffff',
+    // Border - mucho más visible
+    border: '#334155',
+    // Input - más claro y diferenciado
+    input: '#1e293b',
+    // Ring - color primario más brillante
+    ring: '#8b5cf6',
+    // Card - más claro que background para diferenciación clara
+    card: '#1e293b',
+    cardForeground: '#ffffff',
+    // Popover - igual que card para consistencia
+    popover: '#1e293b',
+    popoverForeground: '#ffffff',
+    // Destructive - más brillante y visible
+    destructive: '#ef4444',
     destructiveForeground: '#ffffff',
   },
 }

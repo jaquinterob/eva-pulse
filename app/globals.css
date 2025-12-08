@@ -70,24 +70,82 @@ a {
 }
 
 html[data-theme='dark'] {
-  --background: #081420;
-  --foreground: #fafafa;
-  --primary: #764ba2;
+  --background: #0f172a;
+  --foreground: #ffffff;
+  --primary: #8b5cf6;
   --primary-foreground: #ffffff;
-  --secondary: #0f1f3a;
+  --secondary: #1e293b;
   --secondary-foreground: #f1f5f9;
-  --muted: #0f1f3a;
-  --muted-foreground: #94a3b8;
-  --accent: #0f1f3a;
-  --accent-foreground: #f1f5f9;
-  --border: #152a47;
-  --input: #152a47;
-  --ring: #764ba2;
-  --card: #0f1f3a;
-  --card-foreground: #fafafa;
-  --popover: #0f1f3a;
-  --popover-foreground: #fafafa;
-  --destructive: #7f1d1d;
+  --muted: #1e293b;
+  --muted-foreground: #cbd5e1;
+  --accent: #a855f7;
+  --accent-foreground: #ffffff;
+  --border: #334155;
+  --input: #1e293b;
+  --ring: #8b5cf6;
+  --card: #1e293b;
+  --card-foreground: #ffffff;
+  --popover: #1e293b;
+  --popover-foreground: #ffffff;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
+}
+
+/* Mejoras de accesibilidad y UX para tema oscuro */
+html[data-theme='dark'] {
+  /* Mejorar contraste de scrollbars */
+  scrollbar-color: #334155 #1e293b;
+}
+
+html[data-theme='dark'] * {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #1e293b;
+}
+
+html[data-theme='dark'] *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html[data-theme='dark'] *::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+html[data-theme='dark'] *::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+  border: 2px solid #1e293b;
+}
+
+html[data-theme='dark'] *::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Mejorar visibilidad de elementos interactivos en modo oscuro */
+html[data-theme='dark'] button:focus-visible,
+html[data-theme='dark'] input:focus-visible,
+html[data-theme='dark'] textarea:focus-visible,
+html[data-theme='dark'] select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Mejorar contraste de placeholders */
+html[data-theme='dark'] input::placeholder,
+html[data-theme='dark'] textarea::placeholder {
+  color: #94a3b8;
+  opacity: 0.8;
+}
+
+/* Mejorar visibilidad de selección de texto */
+html[data-theme='dark'] ::selection {
+  background-color: rgba(139, 92, 246, 0.3);
+  color: #ffffff;
+}
+
+html[data-theme='dark'] ::-moz-selection {
+  background-color: rgba(139, 92, 246, 0.3);
+  color: #ffffff;
 }
 
