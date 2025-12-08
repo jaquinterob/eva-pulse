@@ -2,6 +2,7 @@
 
 import { useState, FormEvent, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/lib/hooks/useAuth'
 
 export default function LoginPage() {
@@ -308,6 +309,53 @@ export default function LoginPage() {
         >
           <strong>Desarrollo:</strong> Usuario: <code>dev</code> / Contraseña:{' '}
           <code>dev</code>
+        </div>
+
+        <div
+          style={{
+            marginTop: '1rem',
+            textAlign: 'center',
+          }}
+        >
+          <Link
+            href="/integration"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: 'var(--primary-foreground)',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              opacity: 0.9,
+              transition: 'opacity 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1'
+              e.currentTarget.style.textDecoration = 'underline'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.9'
+              e.currentTarget.style.textDecoration = 'none'
+            }}
+          >
+            <span>Guía de integración técnica</span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </Link>
         </div>
       </div>
     </main>

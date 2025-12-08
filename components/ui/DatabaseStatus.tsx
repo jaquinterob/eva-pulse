@@ -74,11 +74,11 @@ export default function DatabaseStatus() {
       style={{
         padding: '0.75rem 1.5rem',
         background: isConnected 
-          ? 'rgba(34, 197, 94, 0.2)' 
-          : 'rgba(239, 68, 68, 0.2)',
+          ? 'var(--muted)' 
+          : 'var(--muted)',
         borderRadius: '8px',
-        border: `1px solid ${isConnected ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
-        color: 'var(--primary-foreground)',
+        border: `1px solid ${isConnected ? 'var(--primary)' : 'var(--border)'}`,
+        color: 'var(--foreground)',
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
@@ -91,10 +91,10 @@ export default function DatabaseStatus() {
           width: '12px',
           height: '12px',
           borderRadius: '50%',
-          background: isConnected ? '#22c55e' : '#ef4444',
+          background: isConnected ? 'var(--primary)' : 'var(--muted-foreground)',
           boxShadow: isConnected 
-            ? '0 0 8px rgba(34, 197, 94, 0.6)' 
-            : '0 0 8px rgba(239, 68, 68, 0.6)',
+            ? '0 0 8px rgba(0, 0, 0, 0.2)' 
+            : '0 0 8px rgba(0, 0, 0, 0.1)',
         }}
       />
       {isConnected ? '✓ Base de datos conectada' : '✗ Base de datos desconectada'}

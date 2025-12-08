@@ -14,6 +14,7 @@ export interface TrackingSession {
   deviceInfo: {
     platform: string
     language: string
+    releaseDate?: string
   }
   isActive: boolean
 }
@@ -48,6 +49,7 @@ function convertSession(session: any): TrackingSession {
     deviceInfo: {
       platform: session.deviceInfo?.platform || 'Unknown',
       language: session.deviceInfo?.language || 'es-ES',
+      releaseDate: session.deviceInfo?.releaseDate,
     },
     isActive: session.isActive,
   }

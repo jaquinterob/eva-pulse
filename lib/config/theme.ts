@@ -29,59 +29,70 @@ export interface ThemeConfig {
 
 export const themeConfig: ThemeConfig = {
   light: {
-    background: '#e5e7eb',
-    foreground: '#0a0a0a',
-    primary: '#667eea',
+    // Fondo principal - blanco puro
+    background: '#ffffff',
+    // Texto principal - negro puro
+    foreground: '#000000',
+    // Primary - gris oscuro para elementos principales
+    primary: '#262626',
     primaryForeground: '#ffffff',
-    secondary: '#d1d5db',
-    secondaryForeground: '#0f172a',
-    muted: '#d1d5db',
-    mutedForeground: '#64748b',
-    accent: '#764ba2',
+    // Secondary - gris medio claro
+    secondary: '#e5e5e5',
+    secondaryForeground: '#000000',
+    // Muted - gris muy claro
+    muted: '#f5f5f5',
+    mutedForeground: '#525252',
+    // Accent - gris medio oscuro
+    accent: '#404040',
     accentForeground: '#ffffff',
-    border: '#9ca3af',
-    input: '#d1d5db',
-    ring: '#667eea',
-    card: '#f3f4f6',
-    cardForeground: '#0a0a0a',
-    popover: '#f3f4f6',
-    popoverForeground: '#0a0a0a',
-    destructive: '#ef4444',
+    // Border - gris claro
+    border: '#d4d4d4',
+    // Input - gris muy claro
+    input: '#f5f5f5',
+    // Ring - gris oscuro para focus
+    ring: '#262626',
+    // Card - blanco con borde sutil
+    card: '#ffffff',
+    cardForeground: '#000000',
+    // Popover - blanco
+    popover: '#ffffff',
+    popoverForeground: '#000000',
+    // Destructive - gris muy oscuro (casi negro)
+    destructive: '#171717',
     destructiveForeground: '#ffffff',
   },
   dark: {
-    // Background principal - más claro para mejor contraste
-    background: '#0f172a',
-    // Foreground - blanco puro para máximo contraste
+    // Fondo principal - negro puro
+    background: '#000000',
+    // Texto principal - blanco puro
     foreground: '#ffffff',
-    // Primary - más vibrante y visible
-    primary: '#8b5cf6',
-    primaryForeground: '#ffffff',
-    // Secondary - más claro y visible
-    secondary: '#1e293b',
-    secondaryForeground: '#f1f5f9',
-    // Muted - más claro para mejor contraste con background
-    muted: '#1e293b',
-    // Muted foreground - más claro para legibilidad (WCAG AA)
-    mutedForeground: '#cbd5e1',
-    // Accent - más vibrante y diferenciado
-    accent: '#a855f7',
+    // Primary - gris claro para elementos principales
+    primary: '#e5e5e5',
+    primaryForeground: '#000000',
+    // Secondary - gris oscuro
+    secondary: '#262626',
+    secondaryForeground: '#ffffff',
+    // Muted - gris muy oscuro
+    muted: '#171717',
+    mutedForeground: '#a3a3a3',
+    // Accent - gris medio claro
+    accent: '#737373',
     accentForeground: '#ffffff',
-    // Border - mucho más visible
-    border: '#334155',
-    // Input - más claro y diferenciado
-    input: '#1e293b',
-    // Ring - color primario más brillante
-    ring: '#8b5cf6',
-    // Card - más claro que background para diferenciación clara
-    card: '#1e293b',
+    // Border - gris oscuro
+    border: '#404040',
+    // Input - gris muy oscuro
+    input: '#171717',
+    // Ring - gris claro para focus
+    ring: '#e5e5e5',
+    // Card - gris muy oscuro
+    card: '#171717',
     cardForeground: '#ffffff',
-    // Popover - igual que card para consistencia
-    popover: '#1e293b',
+    // Popover - gris muy oscuro
+    popover: '#171717',
     popoverForeground: '#ffffff',
-    // Destructive - más brillante y visible
-    destructive: '#ef4444',
-    destructiveForeground: '#ffffff',
+    // Destructive - gris claro (casi blanco)
+    destructive: '#d4d4d4',
+    destructiveForeground: '#000000',
   },
 }
 

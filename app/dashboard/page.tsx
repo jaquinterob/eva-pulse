@@ -18,6 +18,7 @@ interface TrackingSession {
   deviceInfo: {
     platform: string
     language: string
+    releaseDate?: string
   }
   isActive: boolean
 }
@@ -74,6 +75,9 @@ export default function DashboardPage() {
   const [showAutocomplete, setShowAutocomplete] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
 
+  // Estado para filtro de release date
+  const [selectedReleaseDate, setSelectedReleaseDate] = useState<string | null>(null)
+
   // Estado para el modal de timeline
   const [selectedSessionForTimeline, setSelectedSessionForTimeline] = useState<TrackingSession | null>(null)
 
@@ -81,6 +85,8 @@ export default function DashboardPage() {
   const [allSessions, setAllSessions] = useState<TrackingSession[]>([])
   const [allUsers, setAllUsers] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [timeAgo, setTimeAgo] = useState<string>('')
 
   function handleLogout() {
     logout()
@@ -96,74 +102,130 @@ export default function DashboardPage() {
     ).slice(0, 10) // Limitar a 10 resultados
   }, [searchQuery, allUsers])
 
-  // Cargar datos de la API
+  // Función para calcular tiempo transcurrido
+  const getTimeAgo = (date: Date): string => {
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffSecs = Math.floor(diffMs / 1000)
+    const diffMins = Math.floor(diffSecs / 60)
+    const diffHours = Math.floor(diffMins / 60)
+
+    if (diffSecs < 10) {
+      return 'ahora mismo'
+    } else if (diffSecs < 60) {
+      return `hace ${diffSecs} segundo${diffSecs !== 1 ? 's' : ''}`
+    } else if (diffMins < 60) {
+      return `hace ${diffMins} minuto${diffMins !== 1 ? 's' : ''}`
+    } else if (diffHours < 24) {
+      return `hace ${diffHours} hora${diffHours !== 1 ? 's' : ''}`
+    } else {
+      const diffDays = Math.floor(diffHours / 24)
+      return `hace ${diffDays} día${diffDays !== 1 ? 's' : ''}`
+    }
+  }
+
+  // Actualizar tiempo transcurrido cada segundo
   useEffect(() => {
-    async function loadData() {
-      setLoading(true)
-      try {
-        // Obtener token del localStorage
-        const authData = localStorage.getItem('eva-pulse-auth')
-        const token = authData ? JSON.parse(authData).token : null
+    if (!lastUpdate) return
 
-        if (!token) {
-          console.error('No hay token de autenticación')
-          setLoading(false)
-          return
-        }
-
-        const headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        }
-
-        // Cargar sesiones
-        const sessionsUrl = new URL('/api/tracking/sessions', window.location.origin)
-        sessionsUrl.searchParams.set('startDate', startDateObj.toISOString())
-        sessionsUrl.searchParams.set('endDate', endDateObj.toISOString())
-        if (selectedUser) {
-          sessionsUrl.searchParams.set('appUsername', selectedUser)
-        }
-
-        const sessionsResponse = await fetch(sessionsUrl.toString(), { headers })
-        const sessionsData = await sessionsResponse.json()
-        if (sessionsData.success) {
-          setAllSessions(sessionsData.data.map((s: any) => ({
-            ...s,
-            startTime: new Date(s.startTime),
-            endTime: new Date(s.endTime),
-          })))
-        }
-
-        // Cargar usuarios únicos
-        const statsUrl = new URL('/api/tracking/stats', window.location.origin)
-        statsUrl.searchParams.set('startDate', startDateObj.toISOString())
-        statsUrl.searchParams.set('endDate', endDateObj.toISOString())
-        
-        const usersResponse = await fetch(statsUrl.toString(), { headers })
-        const usersData = await usersResponse.json()
-        if (usersData.success) {
-          // Obtener usuarios únicos de las sesiones
-          const uniqueUsersSet = new Set<string>()
-          sessionsData.data.forEach((s: any) => uniqueUsersSet.add(s.appUsername))
-          setAllUsers(Array.from(uniqueUsersSet))
-        }
-      } catch (error) {
-        console.error('Error loading data:', error)
-      } finally {
-        setLoading(false)
-      }
+    const updateTimeAgo = () => {
+      setTimeAgo(getTimeAgo(lastUpdate))
     }
 
+    updateTimeAgo()
+    const interval = setInterval(updateTimeAgo, 1000)
+
+    return () => clearInterval(interval)
+  }, [lastUpdate])
+
+  // Función para cargar datos de la API
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      // Obtener token del localStorage
+      const authData = localStorage.getItem('eva-pulse-auth')
+      const token = authData ? JSON.parse(authData).token : null
+
+      if (!token) {
+        console.error('No hay token de autenticación')
+        setLoading(false)
+        return
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      }
+
+      // Cargar sesiones
+      const sessionsUrl = new URL('/api/tracking/sessions', window.location.origin)
+      sessionsUrl.searchParams.set('startDate', startDateObj.toISOString())
+      sessionsUrl.searchParams.set('endDate', endDateObj.toISOString())
+      if (selectedUser) {
+        sessionsUrl.searchParams.set('appUsername', selectedUser)
+      }
+
+      const sessionsResponse = await fetch(sessionsUrl.toString(), { headers })
+      const sessionsData = await sessionsResponse.json()
+      if (sessionsData.success) {
+        setAllSessions(sessionsData.data.map((s: any) => ({
+          ...s,
+          startTime: new Date(s.startTime),
+          endTime: new Date(s.endTime),
+        })))
+      }
+
+      // Cargar usuarios únicos
+      const statsUrl = new URL('/api/tracking/stats', window.location.origin)
+      statsUrl.searchParams.set('startDate', startDateObj.toISOString())
+      statsUrl.searchParams.set('endDate', endDateObj.toISOString())
+      
+      const usersResponse = await fetch(statsUrl.toString(), { headers })
+      const usersData = await usersResponse.json()
+      if (usersData.success) {
+        // Obtener usuarios únicos de las sesiones
+        const uniqueUsersSet = new Set<string>()
+        sessionsData.data.forEach((s: any) => uniqueUsersSet.add(s.appUsername))
+        setAllUsers(Array.from(uniqueUsersSet))
+      }
+
+      // Actualizar timestamp de última actualización
+      setLastUpdate(new Date())
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Cargar datos cuando cambian los filtros
+  useEffect(() => {
     loadData()
   }, [startDateObj, endDateObj, selectedUser])
 
-  // Filtrar sesiones según el rango de fechas y usuario seleccionado
+  // Obtener release dates únicos de las sesiones
+  const availableReleaseDates = useMemo(() => {
+    const releaseDatesSet = new Set<string>()
+    allSessions.forEach((s: TrackingSession) => {
+      if (s.deviceInfo?.releaseDate) {
+        releaseDatesSet.add(s.deviceInfo.releaseDate)
+      }
+    })
+    return Array.from(releaseDatesSet).sort().reverse() // Ordenar descendente (más reciente primero)
+  }, [allSessions])
+
+  // Filtrar sesiones según el rango de fechas, usuario y release date seleccionado
   const filteredSessions = useMemo(() => {
     return allSessions.filter(s => {
       const sessionDate = new Date(s.startTime)
-      return sessionDate >= startDateObj && sessionDate <= endDateObj
+      const dateMatch = sessionDate >= startDateObj && sessionDate <= endDateObj
+      
+      const releaseDateMatch = !selectedReleaseDate || 
+        (s.deviceInfo?.releaseDate === selectedReleaseDate)
+      
+      return dateMatch && releaseDateMatch
     })
-  }, [allSessions, startDateObj, endDateObj])
+  }, [allSessions, startDateObj, endDateObj, selectedReleaseDate])
 
   // Manejar selección de usuario
   const handleUserSelect = (username: string) => {
@@ -214,6 +276,43 @@ export default function DashboardPage() {
     setSelectedUser(null)
     setSearchQuery('')
     setShowAutocomplete(false)
+  }
+
+  // Limpiar filtro de release date
+  const clearReleaseDateFilter = () => {
+    setSelectedReleaseDate(null)
+  }
+
+  // Valores por defecto de fechas
+  const defaultStartDate = useMemo(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 7)
+    date.setHours(0, 0, 0, 0)
+    return date.toISOString().slice(0, 16)
+  }, [])
+
+  const defaultEndDate = useMemo(() => {
+    const date = new Date()
+    date.setHours(23, 59, 59, 999)
+    return date.toISOString().slice(0, 16)
+  }, [])
+
+  // Verificar si hay filtros activos
+  const hasActiveFilters = useMemo(() => {
+    return selectedUser !== null || 
+           selectedReleaseDate !== null || 
+           startDate !== defaultStartDate || 
+           endDate !== defaultEndDate
+  }, [selectedUser, selectedReleaseDate, startDate, endDate, defaultStartDate, defaultEndDate])
+
+  // Limpiar todos los filtros
+  const clearAllFilters = () => {
+    setSelectedUser(null)
+    setSearchQuery('')
+    setShowAutocomplete(false)
+    setSelectedReleaseDate(null)
+    setStartDate(defaultStartDate)
+    setEndDate(defaultEndDate)
   }
 
   // Calcular métricas
@@ -322,18 +421,64 @@ export default function DashboardPage() {
             }}
           >
             {user && (
-              <div
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  background: 'var(--muted)',
-                  borderRadius: '6px',
-                  color: 'var(--foreground)',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                }}
-              >
-                {user.username}
-              </div>
+              <>
+                <div
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    background: 'var(--muted)',
+                    borderRadius: '6px',
+                    color: 'var(--foreground)',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  {user.username}
+                </div>
+                <Link
+                  href="/docs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    color: 'var(--foreground)',
+                    background: 'transparent',
+                    fontWeight: 500,
+                    fontSize: '0.875rem',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--muted)'
+                    e.currentTarget.style.borderColor = 'var(--primary)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                  }}
+                >
+                  <span>Guía</span>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ opacity: 0.7 }}
+                  >
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </Link>
+              </>
             )}
             <ThemeToggle />
             <button
@@ -419,7 +564,7 @@ export default function DashboardPage() {
                       setShowAutocomplete(true)
                     }
                     e.currentTarget.style.borderColor = 'var(--primary)'
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 0, 0, 0.1)'
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = 'var(--border)'
@@ -653,24 +798,196 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Selector de Release Date */}
+            <div style={{ flex: '0 0 auto' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: 'var(--muted-foreground)',
+                  marginBottom: '0.375rem',
+                  fontWeight: 500,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Release Date
+              </label>
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={selectedReleaseDate || ''}
+                  onChange={(e) => setSelectedReleaseDate(e.target.value || null)}
+                  style={{
+                    padding: '0.625rem 0.875rem',
+                    paddingRight: selectedReleaseDate ? '2.5rem' : '0.875rem',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    background: 'var(--card)',
+                    color: 'var(--foreground)',
+                    fontSize: '0.875rem',
+                    minWidth: '200px',
+                    width: '100%',
+                    cursor: 'pointer',
+                    appearance: 'none',
+                  }}
+                >
+                  <option value="">Todos los releases</option>
+                  {availableReleaseDates.map((releaseDate) => (
+                    <option key={releaseDate} value={releaseDate}>
+                      {releaseDate}
+                    </option>
+                  ))}
+                </select>
+                {selectedReleaseDate && (
+                  <button
+                    onClick={clearReleaseDateFilter}
+                    style={{
+                      position: 'absolute',
+                      right: '0.5rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'var(--muted)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      width: '24px',
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: 'var(--muted-foreground)',
+                      fontSize: '0.875rem',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--destructive)'
+                      e.currentTarget.style.color = 'var(--destructive-foreground)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--muted)'
+                      e.currentTarget.style.color = 'var(--muted-foreground)'
+                    }}
+                    title="Limpiar filtro de release date"
+                  >
+                    ×
+                  </button>
+                )}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--muted-foreground)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    position: 'absolute',
+                    right: selectedReleaseDate ? '2.5rem' : '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    opacity: 0.6,
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+            </div>
+
           </div>
 
-          {/* Badge de usuario seleccionado */}
-          {selectedUser && (
-            <div
-              style={{
-                marginBottom: '1.5rem',
-                padding: '0.5rem 0.75rem',
-                background: 'var(--primary)',
-                color: 'var(--primary-foreground)',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                display: 'inline-block',
-              }}
-            >
-              Filtrando por: <strong>{selectedUser}</strong>
-            </div>
-          )}
+          {/* Badges de filtros activos y botón limpiar */}
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              display: 'flex',
+              gap: '0.75rem',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            {(selectedUser || selectedReleaseDate) && (
+              <>
+                {selectedUser && (
+                  <div
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      background: 'var(--primary)',
+                      color: 'var(--primary-foreground)',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <span>Usuario: <strong>{selectedUser}</strong></span>
+                  </div>
+                )}
+                {selectedReleaseDate && (
+                  <div
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      background: 'var(--primary)',
+                      color: 'var(--primary-foreground)',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <span>Release: <strong>{selectedReleaseDate}</strong></span>
+                  </div>
+                )}
+              </>
+            )}
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: 'transparent',
+                  color: 'var(--muted-foreground)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--muted)'
+                  e.currentTarget.style.borderColor = 'var(--primary)'
+                  e.currentTarget.style.color = 'var(--foreground)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                  e.currentTarget.style.color = 'var(--muted-foreground)'
+                }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                Limpiar todos los filtros
+              </button>
+            )}
+          </div>
 
           {/* Últimas sesiones en formato de cards */}
           <div
@@ -710,9 +1027,79 @@ export default function DashboardPage() {
                   }}
                 >
                   {latestSessions.length} {latestSessions.length === 1 ? 'sesión' : 'sesiones'} en el rango seleccionado
+                  {lastUpdate && (
+                    <span style={{ marginLeft: '0.75rem' }}>
+                      • Actualizado {timeAgo}
+                    </span>
+                  )}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <button
+                  onClick={loadData}
+                  disabled={loading}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: loading ? 'var(--muted)' : 'var(--primary)',
+                    color: loading ? 'var(--muted-foreground)' : 'var(--primary-foreground)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    transition: 'all 0.2s',
+                    opacity: loading ? 0.6 : 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.opacity = '0.9'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.opacity = '1'
+                    }
+                  }}
+                  title="Actualizar lista de sesiones"
+                >
+                  {loading ? (
+                    <>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ animation: 'spin 1s linear infinite' }}
+                      >
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                      </svg>
+                      Actualizando...
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                      </svg>
+                      Actualizar
+                    </>
+                  )}
+                </button>
                 <CompactMetricCard
                   title="Sesiones"
                   value={totalSessions}
@@ -721,7 +1108,7 @@ export default function DashboardPage() {
                 <CompactMetricCard
                   title="Usuarios"
                   value={uniqueUsers}
-                  color="#8b5cf6"
+                  color="var(--primary)"
                 />
               </div>
             </div>
@@ -1221,6 +1608,12 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
             </h2>
             <div style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
               {session.appUsername} • {formatSessionDate(session.startTime)} • {formatDuration(session.duration)} • {loadingEvents ? '...' : sessionEvents.length} eventos
+              {session.deviceInfo?.releaseDate && (
+                <span style={{ marginLeft: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                  • <span style={{ fontSize: '0.8125rem', opacity: 0.8 }}>Release:</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--primary)' }}>{session.deviceInfo.releaseDate}</span>
+                </span>
+              )}
               {lastUpdate && (
                 <span style={{ marginLeft: '0.75rem', fontSize: '0.8125rem' }}>
                   • Última actualización: {lastUpdate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} ({timeAgo})
@@ -1834,8 +2227,8 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
             style={{ 
               display: 'inline-block', 
               verticalAlign: 'middle',
-              filter: 'grayscale(100%)',
-              opacity: 0.8
+              filter: 'grayscale(100%) brightness(0.3)',
+              opacity: 1
             }}
           />
         )
@@ -1958,31 +2351,67 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
               marginTop: '0.75rem',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.8125rem',
-                color: 'var(--muted-foreground)',
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ opacity: 0.7 }}
+            {session.duration > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.8125rem',
+                  color: 'var(--muted-foreground)',
+                }}
               >
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              <span>{formatDuration(session.duration)}</span>
-            </div>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ opacity: 0.7 }}
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>{formatDuration(session.duration)}</span>
+              </div>
+            )}
+            {session.deviceInfo?.releaseDate && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.625rem',
+                  background: 'var(--muted)',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  color: 'var(--foreground)',
+                }}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ opacity: 0.6 }}
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <span style={{ fontSize: '0.6875rem', fontWeight: 500, opacity: 0.8 }}>Release:</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{session.deviceInfo.releaseDate}</span>
+              </div>
+            )}
             <div
               style={{
                 display: 'flex',
@@ -2018,8 +2447,9 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
               borderRadius: '12px',
               fontSize: '0.75rem',
               fontWeight: 600,
-              background: session.isActive ? 'rgba(34, 197, 94, 0.1)' : 'var(--muted)',
-              color: session.isActive ? '#22c55e' : 'var(--muted-foreground)',
+              background: session.isActive ? 'var(--muted)' : 'var(--muted)',
+              color: session.isActive ? 'var(--foreground)' : 'var(--muted-foreground)',
+              border: session.isActive ? '1px solid var(--border)' : 'none',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
             }}
