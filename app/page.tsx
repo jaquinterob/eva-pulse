@@ -70,7 +70,7 @@ export default function Home() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '2rem',
+        padding: '1rem',
         background: `linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)`,
         color: 'var(--primary-foreground)',
         position: 'relative',
@@ -80,8 +80,9 @@ export default function Home() {
       <div
         style={{
           position: 'absolute',
-          top: '1rem',
-          right: '1rem',
+          top: '0.75rem',
+          right: '0.75rem',
+          zIndex: 10,
         }}
       >
         <ThemeToggle />
@@ -91,7 +92,7 @@ export default function Home() {
         style={{
           width: '100%',
           maxWidth: '400px',
-          padding: '2rem',
+          padding: '1.5rem',
           background: 'var(--card)',
           borderRadius: '12px',
           border: '1px solid var(--border)',
@@ -100,7 +101,7 @@ export default function Home() {
       >
         <h1
           style={{
-            fontSize: '2rem',
+            fontSize: 'clamp(1.5rem, 5vw, 2rem)',
             fontWeight: 'bold',
             marginBottom: '0.5rem',
             color: 'var(--foreground)',
@@ -111,9 +112,10 @@ export default function Home() {
         </h1>
         <p
           style={{
-            marginBottom: '2rem',
+            marginBottom: '1.5rem',
             color: 'var(--muted-foreground)',
             textAlign: 'center',
+            fontSize: '0.9375rem',
           }}
         >
           Ingresa tus credenciales para continuar
@@ -158,14 +160,16 @@ export default function Home() {
               }
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: '0.875rem',
                 border: `1px solid ${errors.username ? 'var(--destructive)' : 'var(--border)'}`,
                 borderRadius: '8px',
                 background: 'var(--background)',
                 color: 'var(--foreground)',
-                fontSize: '1rem',
+                fontSize: '16px', /* Prevenir zoom en iOS */
                 outline: 'none',
                 transition: 'border-color 0.2s',
+                WebkitAppearance: 'none',
+                appearance: 'none',
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = 'var(--primary)'
@@ -217,15 +221,17 @@ export default function Home() {
                 }
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
+                  padding: '0.875rem',
                   paddingRight: '3rem',
                   border: `1px solid ${errors.password ? 'var(--destructive)' : 'var(--border)'}`,
                   borderRadius: '8px',
                   background: 'var(--background)',
                   color: 'var(--foreground)',
-                  fontSize: '1rem',
+                  fontSize: '16px', /* Prevenir zoom en iOS */
                   outline: 'none',
                   transition: 'border-color 0.2s',
+                  WebkitAppearance: 'none',
+                  appearance: 'none',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--primary)'
@@ -309,7 +315,8 @@ export default function Home() {
             disabled={isSubmitting || isLoading}
             style={{
               width: '100%',
-              padding: '0.75rem',
+              padding: '0.875rem',
+              minHeight: '48px', /* Área táctil más grande */
               background: 'var(--primary)',
               color: 'var(--primary-foreground)',
               border: 'none',
@@ -319,6 +326,7 @@ export default function Home() {
               cursor: isSubmitting || isLoading ? 'not-allowed' : 'pointer',
               opacity: isSubmitting || isLoading ? 0.6 : 1,
               transition: 'opacity 0.2s',
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             {isSubmitting ? 'Iniciando sesión...' : 'Iniciar Sesión'}

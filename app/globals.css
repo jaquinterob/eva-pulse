@@ -26,10 +26,19 @@
   --destructive-foreground: #ffffff;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+  /* Prevenir zoom en inputs en iOS */
+  touch-action: manipulation;
 }
 
 body {
@@ -147,5 +156,52 @@ html[data-theme='dark'] ::selection {
 html[data-theme='dark'] ::-moz-selection {
   background-color: rgba(229, 229, 229, 0.3);
   color: #ffffff;
+}
+
+/* Optimizaciones para móviles */
+@media (max-width: 768px) {
+  body {
+    font-size: 16px; /* Prevenir zoom automático en iOS */
+  }
+
+  /* Mejorar área táctil de botones e inputs */
+  button,
+  input,
+  select,
+  textarea,
+  a {
+    min-height: 44px; /* Tamaño mínimo recomendado para elementos táctiles */
+    min-width: 44px;
+  }
+
+  /* Prevenir zoom en inputs en iOS */
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    font-size: 16px; /* Prevenir zoom automático en iOS */
+  }
+}
+
+/* Optimizaciones para tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+  body {
+    font-size: 15px;
+  }
+}
+
+/* Mejoras de rendimiento en móviles */
+@media (max-width: 768px) {
+  * {
+    /* Reducir animaciones en móviles para mejor rendimiento */
+    animation-duration: 0.2s !important;
+    transition-duration: 0.2s !important;
+  }
 }
 

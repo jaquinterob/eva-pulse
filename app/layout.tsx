@@ -5,6 +5,20 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Eva Pulse',
   description: 'Aplicación monolítica con Next.js y TypeScript',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
+  ],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+  },
 }
 
 export default function RootLayout({

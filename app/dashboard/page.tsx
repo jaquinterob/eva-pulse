@@ -355,6 +355,19 @@ export default function DashboardPage() {
           display: none !important;
           -webkit-appearance: none;
         }
+        @media (min-width: 768px) {
+          .timeline-modal-grid {
+            grid-template-columns: 60% 40% !important;
+            grid-template-rows: 1fr !important;
+          }
+          .timeline-modal-timeline {
+            border-right: 1px solid var(--border) !important;
+            border-bottom: none !important;
+          }
+          .timeline-modal-details {
+            max-height: none !important;
+          }
+        }
       `}} />
       <main
         style={{
@@ -366,25 +379,30 @@ export default function DashboardPage() {
         {/* Header estilo Amplitude */}
         <header
           style={{
-            padding: '0.75rem 1.5rem',
+            padding: '0.75rem 1rem',
             borderBottom: '1px solid var(--border)',
             background: 'var(--card)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
             position: 'sticky',
             top: 0,
             zIndex: 100,
             boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: '1 1 auto', minWidth: 0 }}>
             <h1
               style={{
-                fontSize: '1.25rem',
+                fontSize: 'clamp(1rem, 4vw, 1.25rem)',
                 fontWeight: 600,
                 color: 'var(--foreground)',
                 margin: 0,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               Eva Pulse
@@ -407,6 +425,7 @@ export default function DashboardPage() {
                   color: 'var(--foreground)',
                   background: 'var(--muted)',
                   fontWeight: 500,
+                  whiteSpace: 'nowrap',
                 }}
               >
                 Dashboard
@@ -416,8 +435,9 @@ export default function DashboardPage() {
           <div
             style={{
               display: 'flex',
-              gap: '1rem',
+              gap: '0.5rem',
               alignItems: 'center',
+              flexWrap: 'wrap',
             }}
           >
             {user && (
@@ -430,6 +450,10 @@ export default function DashboardPage() {
                     color: 'var(--foreground)',
                     fontSize: '0.875rem',
                     fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '150px',
                   }}
                 >
                   {user.username}
@@ -510,7 +534,7 @@ export default function DashboardPage() {
 
         <div
           style={{
-            padding: '2rem',
+            padding: '1rem',
             maxWidth: '1600px',
             margin: '0 auto',
           }}
@@ -518,9 +542,9 @@ export default function DashboardPage() {
           {/* Filtros y métricas en la misma línea */}
           <div
             style={{
-              marginBottom: '2rem',
+              marginBottom: '1.5rem',
               display: 'flex',
-              gap: '1.5rem',
+              gap: '1rem',
               alignItems: 'flex-end',
               flexWrap: 'wrap',
             }}
@@ -529,7 +553,8 @@ export default function DashboardPage() {
             <div
               style={{
                 position: 'relative',
-                flex: '0 0 auto',
+                flex: '1 1 100%',
+                minWidth: '200px',
               }}
             >
               <label
@@ -573,16 +598,18 @@ export default function DashboardPage() {
                   placeholder="Escribe al menos 2 letras para buscar..."
                   style={{
                     width: '100%',
-                    minWidth: '295px',
-                    padding: '0.75rem 1rem',
+                    padding: '0.875rem 1rem',
                     paddingRight: selectedUser ? '2.5rem' : '1rem',
                     border: '1px solid var(--border)',
                     borderRadius: '8px',
                     background: 'var(--card)',
                     color: 'var(--foreground)',
-                    fontSize: '0.875rem',
+                    fontSize: '16px', /* Prevenir zoom en iOS */
                     outline: 'none',
                     transition: 'all 0.2s',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                    minHeight: '44px',
                   }}
                 />
                 {selectedUser && (
@@ -681,8 +708,8 @@ export default function DashboardPage() {
             </div>
 
             {/* Selector de fechas */}
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
-              <div style={{ flex: '0 0 auto' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flex: '1 1 auto', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 150px', minWidth: '150px' }}>
                 <label
                   style={{
                     display: 'block',
@@ -702,15 +729,17 @@ export default function DashboardPage() {
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                     style={{
-                      padding: '0.625rem 0.875rem',
+                      padding: '0.75rem 0.875rem',
                       paddingRight: '2.5rem',
                       border: '1px solid var(--border)',
                       borderRadius: '6px',
                       background: 'var(--card)',
                       color: 'var(--foreground)',
-                      fontSize: '0.875rem',
-                      minWidth: '200px',
+                      fontSize: '16px', /* Prevenir zoom en iOS */
                       width: '100%',
+                      minHeight: '44px',
+                      WebkitAppearance: 'none',
+                      appearance: 'none',
                     }}
                     className="datetime-input"
                   />
@@ -739,7 +768,7 @@ export default function DashboardPage() {
                   </svg>
                 </div>
               </div>
-              <div style={{ flex: '0 0 auto' }}>
+              <div style={{ flex: '1 1 150px', minWidth: '150px' }}>
                 <label
                   style={{
                     display: 'block',
@@ -759,15 +788,17 @@ export default function DashboardPage() {
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                     style={{
-                      padding: '0.625rem 0.875rem',
+                      padding: '0.75rem 0.875rem',
                       paddingRight: '2.5rem',
                       border: '1px solid var(--border)',
                       borderRadius: '6px',
                       background: 'var(--card)',
                       color: 'var(--foreground)',
-                      fontSize: '0.875rem',
-                      minWidth: '200px',
+                      fontSize: '16px', /* Prevenir zoom en iOS */
                       width: '100%',
+                      minHeight: '44px',
+                      WebkitAppearance: 'none',
+                      appearance: 'none',
                     }}
                     className="datetime-input"
                   />
@@ -799,7 +830,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Selector de Release Date */}
-            <div style={{ flex: '0 0 auto' }}>
+            <div style={{ flex: '1 1 150px', minWidth: '150px' }}>
               <label
                 style={{
                   display: 'block',
@@ -818,16 +849,17 @@ export default function DashboardPage() {
                   value={selectedReleaseDate || ''}
                   onChange={(e) => setSelectedReleaseDate(e.target.value || null)}
                   style={{
-                    padding: '0.625rem 0.875rem',
+                    padding: '0.75rem 0.875rem',
                     paddingRight: selectedReleaseDate ? '2.5rem' : '0.875rem',
                     border: '1px solid var(--border)',
                     borderRadius: '6px',
                     background: 'var(--card)',
                     color: 'var(--foreground)',
-                    fontSize: '0.875rem',
-                    minWidth: '200px',
+                    fontSize: '16px', /* Prevenir zoom en iOS */
                     width: '100%',
+                    minHeight: '44px',
                     cursor: 'pointer',
+                    WebkitAppearance: 'none',
                     appearance: 'none',
                   }}
                 >
@@ -1034,12 +1066,13 @@ export default function DashboardPage() {
                   )}
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
                   onClick={loadData}
                   disabled={loading}
                   style={{
-                    padding: '0.5rem 1rem',
+                    padding: '0.625rem 1rem',
+                    minHeight: '44px',
                     background: loading ? 'var(--muted)' : 'var(--primary)',
                     color: loading ? 'var(--muted-foreground)' : 'var(--primary-foreground)',
                     border: 'none',
@@ -1052,6 +1085,7 @@ export default function DashboardPage() {
                     gap: '0.5rem',
                     transition: 'all 0.2s',
                     opacity: loading ? 0.6 : 1,
+                    WebkitTapHighlightColor: 'transparent',
                   }}
                   onMouseEnter={(e) => {
                     if (!loading) {
@@ -1172,7 +1206,8 @@ function CompactMetricCard({ title, value, color }: {
         borderRadius: '8px',
         border: '1px solid var(--border)',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-        minWidth: '120px',
+        minWidth: '100px',
+        flex: '1 1 auto',
       }}
     >
       <div
@@ -1559,9 +1594,9 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
         background: 'rgba(0, 0, 0, 0.5)',
         zIndex: 10000,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem',
+        alignItems: 'stretch',
+        justifyContent: 'stretch',
+        padding: '0',
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -1576,7 +1611,7 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
           maxWidth: '100vw',
           maxHeight: '100vh',
           background: 'var(--background)',
-          borderRadius: '16px',
+          borderRadius: '0',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -1587,18 +1622,20 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
         {/* Header del Modal */}
         <div
           style={{
-            padding: '1.5rem 2rem',
+            padding: '1rem 1.25rem',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             background: 'var(--card)',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
           }}
         >
-          <div>
+          <div style={{ flex: '1 1 auto', minWidth: 0 }}>
             <h2
               style={{
-                fontSize: '1.5rem',
+                fontSize: 'clamp(1.125rem, 4vw, 1.5rem)',
                 fontWeight: 700,
                 color: 'var(--foreground)',
                 margin: '0 0 0.5rem 0',
@@ -1606,7 +1643,7 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
             >
               Timeline de Sesión
             </h2>
-            <div style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--muted-foreground)', lineHeight: '1.5' }}>
               {session.appUsername} • {formatSessionDate(session.startTime)} • {formatDuration(session.duration)} • {loadingEvents ? '...' : sessionEvents.length} eventos
               {session.deviceInfo?.releaseDate && (
                 <span style={{ marginLeft: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -1621,7 +1658,7 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
             <button
               onClick={loadEvents}
               disabled={loadingEvents}
@@ -1634,13 +1671,16 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
                 color: loadingEvents ? 'var(--muted-foreground)' : 'var(--primary-foreground)',
                 fontSize: '1rem',
                 lineHeight: 1,
-                width: '40px',
-                height: '40px',
+                minWidth: '44px',
+                minHeight: '44px',
+                width: '44px',
+                height: '44px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 0.2s',
                 opacity: loadingEvents ? 0.6 : 1,
+                WebkitTapHighlightColor: 'transparent',
               }}
               onMouseEnter={(e) => {
                 if (!loadingEvents) {
@@ -1677,12 +1717,15 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
                 color: 'var(--foreground)',
                 fontSize: '1.5rem',
                 lineHeight: 1,
-                width: '40px',
-                height: '40px',
+                minWidth: '44px',
+                minHeight: '44px',
+                width: '44px',
+                height: '44px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 0.2s',
+                WebkitTapHighlightColor: 'transparent',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--destructive)'
@@ -1698,23 +1741,27 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
           </div>
         </div>
 
-        {/* Contenido dividido en 60-40 */}
+        {/* Contenido dividido en 60-40 (responsive) */}
         <div
+          className="timeline-modal-grid"
           style={{
             flex: 1,
             display: 'grid',
-            gridTemplateColumns: '60% 40%',
+            gridTemplateColumns: '1fr',
+            gridTemplateRows: '1fr auto',
             overflow: 'hidden',
             background: 'var(--background)',
           }}
         >
-          {/* Mitad izquierda: Timeline */}
+          {/* Timeline (arriba en móvil, izquierda en desktop) */}
           <div
             ref={timelineContainerRef}
+            className="timeline-modal-timeline"
             style={{
               overflowY: 'auto',
-              padding: '2rem',
-              borderRight: '1px solid var(--border)',
+              padding: '1rem',
+              borderBottom: '1px solid var(--border)',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             {loadingEvents ? (
@@ -1740,12 +1787,12 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
                 No hay eventos en esta sesión
               </div>
             ) : (
-              <div style={{ position: 'relative', paddingLeft: '3rem' }}>
-                {/* Línea vertical - centrada en 25px */}
+              <div style={{ position: 'relative', paddingLeft: 'clamp(2.5rem, 5vw, 3rem)' }}>
+                {/* Línea vertical - responsive */}
                 <div
                   style={{
                     position: 'absolute',
-                    left: '24px',
+                    left: 'clamp(19px, 4vw, 24px)',
                     top: '0',
                     bottom: '0',
                     width: '2px',
@@ -1841,7 +1888,7 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
                           <div
                             style={{
                               position: 'absolute',
-                              left: '-23px', // Centro exacto: 24px (inicio línea) + 1px (mitad de 2px de ancho)
+                              left: '-20px', // Aproximado para centrar en la línea (responsive con padding)
                               top: '2px',
                               width: `${pointSize}px`,
                               height: `${pointSize}px`,
@@ -1917,12 +1964,15 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
             )}
           </div>
 
-          {/* Mitad derecha: Detalles del evento */}
+          {/* Detalles del evento (abajo en móvil, derecha en desktop) */}
           <div
+            className="timeline-modal-details"
             style={{
               overflowY: 'auto',
-              padding: '2rem',
+              padding: '1rem',
               background: 'var(--card)',
+              maxHeight: '50vh',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             {selectedEvent ? (
@@ -2286,7 +2336,8 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
-          gap: '1rem',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
         }}
       >
         <div style={{ flex: 1 }}>
@@ -2346,7 +2397,7 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
           <div
             style={{
               display: 'flex',
-              gap: '1rem',
+              gap: '0.75rem',
               flexWrap: 'wrap',
               marginTop: '0.75rem',
             }}
