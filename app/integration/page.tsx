@@ -229,7 +229,7 @@ export default function IntegrationPage() {
                   <span style={{ color: 'var(--muted-foreground)' }}>// Usar el token en headers:</span>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--accent)' }}>'Authorization'</span>: <span style={{ color: 'var(--accent)' }}>`Bearer ${'{'}</span><span style={{ color: 'var(--primary)' }}>data</span>.<span style={{ color: 'var(--primary)' }}>data</span>.<span style={{ color: 'var(--primary)' }}>token</span><span style={{ color: 'var(--accent)' }}>}`</span>
+                  <span style={{ color: 'var(--accent)' }}>'Authorization'</span>: <span style={{ color: 'var(--accent)' }}>`Bearer {'{'}</span><span style={{ color: 'var(--primary)' }}>data</span>.<span style={{ color: 'var(--primary)' }}>data</span>.<span style={{ color: 'var(--primary)' }}>token</span><span style={{ color: 'var(--accent)' }}>{'}'}`</span>
                 </div>
               </div>
             </div>
