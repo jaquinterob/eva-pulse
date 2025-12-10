@@ -88,6 +88,27 @@ export default function DashboardPage() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [timeAgo, setTimeAgo] = useState<string>('')
 
+  // Estado para estadísticas de inferencia
+  const [inferenceStats, setInferenceStats] = useState<{
+    average: number
+    max: number
+    min: number
+    total: number
+    maxPair: {
+      duration: number
+      startTime: string
+      responseTime: string
+      sessionId: string
+    } | null
+    minPair: {
+      duration: number
+      startTime: string
+      responseTime: string
+      sessionId: string
+    } | null
+  } | null>(null)
+  const [loadingStats, setLoadingStats] = useState(false)
+
   function handleLogout() {
     logout()
     router.push('/')
@@ -137,6 +158,42 @@ export default function DashboardPage() {
 
     return () => clearInterval(interval)
   }, [lastUpdate])
+
+  // Función para cargar estadísticas de inferencia
+  const loadInferenceStats = async () => {
+    setLoadingStats(true)
+    try {
+      const authData = localStorage.getItem('eva-pulse-auth')
+      const token = authData ? JSON.parse(authData).token : null
+
+      if (!token) {
+        setLoadingStats(false)
+        return
+      }
+
+      const response = await fetch('/api/tracking/inference-stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setInferenceStats({
+          average: data.data.average,
+          max: data.data.max,
+          min: data.data.min,
+          total: data.data.total,
+          maxPair: data.data.maxPair,
+          minPair: data.data.minPair,
+        })
+      }
+    } catch (error) {
+      console.error('Error loading inference stats:', error)
+    } finally {
+      setLoadingStats(false)
+    }
+  }
 
   // Función para cargar datos de la API
   const loadData = async () => {
@@ -202,6 +259,11 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData()
   }, [startDateObj, endDateObj, selectedUser])
+
+  // Cargar estadísticas de inferencia al montar
+  useEffect(() => {
+    loadInferenceStats()
+  }, [])
 
   // Obtener release dates únicos de las sesiones
   const availableReleaseDates = useMemo(() => {
@@ -313,6 +375,54 @@ export default function DashboardPage() {
     setSelectedReleaseDate(null)
     setStartDate(defaultStartDate)
     setEndDate(defaultEndDate)
+  }
+
+  // Función para cargar sesión desde sessionId para el modal
+  const loadSessionForModal = async (sessionId: string) => {
+    try {
+      const authData = localStorage.getItem('eva-pulse-auth')
+      const token = authData ? JSON.parse(authData).token : null
+
+      if (!token) {
+        console.error('No hay token de autenticación')
+        return
+      }
+
+      // Obtener eventos para encontrar el appUsername y otros datos
+      const eventsResponse = await fetch(`/api/tracking/events?sessionId=${sessionId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      const eventsData = await eventsResponse.json()
+      
+      if (eventsData.success && eventsData.data.length > 0) {
+        const firstEvent = eventsData.data[0]
+        const lastEvent = eventsData.data[eventsData.data.length - 1]
+        
+        // Crear sesión temporal con los datos disponibles
+        const tempSession: TrackingSession = {
+          sessionId: sessionId,
+          appUsername: firstEvent.appUsername || 'unknown',
+          startTime: new Date(firstEvent.timestamp),
+          endTime: new Date(lastEvent.timestamp),
+          duration: Math.floor(
+            (new Date(lastEvent.timestamp).getTime() - new Date(firstEvent.timestamp).getTime()) / 1000
+          ),
+          eventCount: eventsData.data.length,
+          deviceInfo: {
+            platform: firstEvent.context?.page || 'Unknown',
+            language: 'es-ES',
+          },
+          isActive: false,
+        }
+
+        setSelectedSessionForTimeline(tempSession)
+      }
+    } catch (err) {
+      console.error('Error loading session:', err)
+    }
   }
 
   // Calcular métricas
@@ -539,6 +649,49 @@ export default function DashboardPage() {
             margin: '0 auto',
           }}
         >
+          {/* Cards de estadísticas de inferencia - Minimalistas y completas */}
+          {inferenceStats && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '0.875rem',
+                marginBottom: '1.5rem',
+                maxWidth: '700px',
+              }}
+            >
+              <MinimalStatCard
+                title="Tiempo Promedio"
+                value={inferenceStats.average}
+                description={`de ${inferenceStats.total} evaluaciones`}
+                color="var(--primary)"
+                loading={loadingStats}
+              />
+              {inferenceStats.maxPair && (
+                <MinimalStatCard
+                  title="Tiempo Máximo"
+                  value={inferenceStats.max}
+                  description="inferencia más lenta"
+                  color="var(--destructive)"
+                  loading={loadingStats}
+                  onClick={() => loadSessionForModal(inferenceStats.maxPair!.sessionId)}
+                  clickable
+                />
+              )}
+              {inferenceStats.minPair && (
+                <MinimalStatCard
+                  title="Tiempo Mínimo"
+                  value={inferenceStats.min}
+                  description="inferencia más rápida"
+                  color="var(--accent)"
+                  loading={loadingStats}
+                  onClick={() => loadSessionForModal(inferenceStats.minPair!.sessionId)}
+                  clickable
+                />
+              )}
+            </div>
+          )}
+
           {/* Filtros y métricas en la misma línea */}
           <div
             style={{
@@ -1190,6 +1343,154 @@ export default function DashboardPage() {
         )}
       </main>
     </AuthGuard>
+  )
+}
+
+function MinimalStatCard({ 
+  title, 
+  value, 
+  description, 
+  color, 
+  loading, 
+  onClick,
+  clickable 
+}: {
+  title: string
+  value: number
+  description?: string
+  color: string
+  loading?: boolean
+  onClick?: () => void
+  clickable?: boolean
+}) {
+  const formatDuration = (ms: number): string => {
+    if (ms < 1000) {
+      return `${Math.round(ms)}ms`
+    } else if (ms < 60000) {
+      return `${(ms / 1000).toFixed(1)}s`
+    } else {
+      const minutes = Math.floor(ms / 60000)
+      const seconds = ((ms % 60000) / 1000).toFixed(1)
+      return `${minutes}m ${seconds}s`
+    }
+  }
+
+  return (
+    <div
+      onClick={clickable && onClick ? onClick : undefined}
+      style={{
+        padding: '0.875rem 1rem',
+        background: 'var(--card)',
+        borderRadius: '8px',
+        border: `1px solid ${clickable ? color : 'var(--border)'}`,
+        boxShadow: clickable 
+          ? `0 1px 3px ${color}15, 0 1px 2px rgba(0,0,0,0.05)`
+          : '0 1px 2px rgba(0,0,0,0.03)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.375rem',
+        minHeight: '75px',
+        cursor: clickable ? 'pointer' : 'default',
+        transition: 'all 0.2s ease',
+        position: 'relative',
+      }}
+      onMouseEnter={(e) => {
+        if (clickable) {
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.boxShadow = `0 4px 12px ${color}25, 0 2px 4px rgba(0,0,0,0.08)`
+          e.currentTarget.style.borderColor = color
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (clickable) {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = `0 1px 3px ${color}15, 0 1px 2px rgba(0,0,0,0.05)`
+        }
+      }}
+    >
+      {/* Indicador de clickeable */}
+      {clickable && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '0.5rem',
+            right: '0.5rem',
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: color,
+            opacity: 0.4,
+          }}
+        />
+      )}
+      
+      <div
+        style={{
+          fontSize: '0.6875rem',
+          color: 'var(--muted-foreground)',
+          fontWeight: 500,
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          lineHeight: 1.3,
+        }}
+      >
+        {title}
+      </div>
+      
+      <div
+        style={{
+          fontSize: '1.125rem',
+          fontWeight: 700,
+          color: color,
+          lineHeight: 1.2,
+          marginBottom: description ? '0.125rem' : '0',
+        }}
+      >
+        {loading ? '...' : formatDuration(value)}
+      </div>
+      
+      {description && (
+        <div
+          style={{
+            fontSize: '0.6875rem',
+            color: 'var(--muted-foreground)',
+            lineHeight: 1.3,
+            opacity: 0.8,
+          }}
+        >
+          {description}
+        </div>
+      )}
+      
+      {clickable && (
+        <div
+          style={{
+            fontSize: '0.625rem',
+            color: color,
+            fontWeight: 500,
+            marginTop: '0.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            opacity: 0.7,
+          }}
+        >
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M13.8 12H3" />
+          </svg>
+          Ver sesión
+        </div>
+      )}
+    </div>
   )
 }
 
