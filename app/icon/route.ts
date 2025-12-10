@@ -1,5 +1,7 @@
-export default function Icon() {
-  return `<?xml version="1.0" encoding="UTF-8"?>
+import { NextResponse } from 'next/server'
+
+export async function GET() {
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg
   width="32"
   height="32"
@@ -22,5 +24,12 @@ export default function Icon() {
     strokeLinejoin="round"
   />
 </svg>`
+
+  return new NextResponse(svg, {
+    headers: {
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
+  })
 }
 
