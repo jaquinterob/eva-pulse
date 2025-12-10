@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/hooks/useAuth'
 import AuthGuard from '@/components/AuthGuard'
 import ThemeToggle from '@/components/ui/ThemeToggle'
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 
 // Tipos compatibles con los datos de la API
 interface TrackingSession {
@@ -160,7 +160,7 @@ export default function DashboardPage() {
   }, [lastUpdate])
 
   // Función para cargar estadísticas de inferencia
-  const loadInferenceStats = async () => {
+  const loadInferenceStats = useCallback(async () => {
     setLoadingStats(true)
     try {
       const authData = localStorage.getItem('eva-pulse-auth')
@@ -171,7 +171,15 @@ export default function DashboardPage() {
         return
       }
 
-      const response = await fetch('/api/tracking/inference-stats', {
+      // Construir URL con parámetros de filtro
+      const statsUrl = new URL('/api/tracking/inference-stats', window.location.origin)
+      statsUrl.searchParams.set('startDate', startDateObj.toISOString())
+      statsUrl.searchParams.set('endDate', endDateObj.toISOString())
+      if (selectedUser) {
+        statsUrl.searchParams.set('appUsername', selectedUser)
+      }
+
+      const response = await fetch(statsUrl.toString(), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -179,91 +187,153 @@ export default function DashboardPage() {
 
       const data = await response.json()
       if (data.success) {
-        setInferenceStats({
-          average: data.data.average,
-          max: data.data.max,
-          min: data.data.min,
-          total: data.data.total,
-          maxPair: data.data.maxPair,
-          minPair: data.data.minPair,
-        })
+        // Si hay filtro de releaseDate, filtrar los pares por las sesiones que coinciden
+        let filteredPairs = data.data.allPairs || []
+        
+        if (selectedReleaseDate && filteredPairs.length > 0) {
+          // Obtener sessionIds de las sesiones que coinciden con el releaseDate
+          const filteredSessionIds = new Set(
+            allSessions
+              .filter(s => {
+                const sessionDate = new Date(s.startTime)
+                const dateMatch = sessionDate >= startDateObj && sessionDate <= endDateObj
+                const userMatch = !selectedUser || s.appUsername === selectedUser
+                const releaseDateMatch = s.deviceInfo?.releaseDate === selectedReleaseDate
+                return dateMatch && userMatch && releaseDateMatch
+              })
+              .map(s => s.sessionId)
+          )
+          
+          // Filtrar los pares por sessionId
+          filteredPairs = filteredPairs.filter((p: any) => 
+            filteredSessionIds.has(p.sessionId)
+          )
+          
+          // Recalcular estadísticas con los pares filtrados
+          if (filteredPairs.length > 0) {
+            const durations = filteredPairs.map((p: any) => p.duration)
+            const average = durations.reduce((a: number, b: number) => a + b, 0) / durations.length
+            const max = Math.max(...durations)
+            const min = Math.min(...durations)
+            
+            const maxPair = filteredPairs.find((p: any) => p.duration === max)
+            const minPair = filteredPairs.find((p: any) => p.duration === min)
+            
+            setInferenceStats({
+              average: Math.round(average),
+              max: max,
+              min: min,
+              total: filteredPairs.length,
+              maxPair: maxPair ? {
+                duration: maxPair.duration,
+                startTime: maxPair.startTime,
+                responseTime: maxPair.responseTime,
+                sessionId: maxPair.sessionId,
+              } : null,
+              minPair: minPair ? {
+                duration: minPair.duration,
+                startTime: minPair.startTime,
+                responseTime: minPair.responseTime,
+                sessionId: minPair.sessionId,
+              } : null,
+            })
+          } else {
+            setInferenceStats({
+              average: 0,
+              max: 0,
+              min: 0,
+              total: 0,
+              maxPair: null,
+              minPair: null,
+            })
+          }
+        } else {
+          setInferenceStats({
+            average: data.data.average,
+            max: data.data.max,
+            min: data.data.min,
+            total: data.data.total,
+            maxPair: data.data.maxPair,
+            minPair: data.data.minPair,
+          })
+        }
       }
     } catch (error) {
       console.error('Error loading inference stats:', error)
     } finally {
       setLoadingStats(false)
     }
-  }
+  }, [startDateObj, endDateObj, selectedUser, selectedReleaseDate, allSessions])
 
   // Función para cargar datos de la API
   const loadData = async () => {
-    setLoading(true)
-    try {
-      // Obtener token del localStorage
-      const authData = localStorage.getItem('eva-pulse-auth')
-      const token = authData ? JSON.parse(authData).token : null
+      setLoading(true)
+      try {
+        // Obtener token del localStorage
+        const authData = localStorage.getItem('eva-pulse-auth')
+        const token = authData ? JSON.parse(authData).token : null
 
-      if (!token) {
-        console.error('No hay token de autenticación')
-        setLoading(false)
-        return
-      }
+        if (!token) {
+          console.error('No hay token de autenticación')
+          setLoading(false)
+          return
+        }
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      }
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        }
 
-      // Cargar sesiones
-      const sessionsUrl = new URL('/api/tracking/sessions', window.location.origin)
-      sessionsUrl.searchParams.set('startDate', startDateObj.toISOString())
-      sessionsUrl.searchParams.set('endDate', endDateObj.toISOString())
-      if (selectedUser) {
-        sessionsUrl.searchParams.set('appUsername', selectedUser)
-      }
+        // Cargar sesiones
+        const sessionsUrl = new URL('/api/tracking/sessions', window.location.origin)
+        sessionsUrl.searchParams.set('startDate', startDateObj.toISOString())
+        sessionsUrl.searchParams.set('endDate', endDateObj.toISOString())
+        if (selectedUser) {
+          sessionsUrl.searchParams.set('appUsername', selectedUser)
+        }
 
-      const sessionsResponse = await fetch(sessionsUrl.toString(), { headers })
-      const sessionsData = await sessionsResponse.json()
-      if (sessionsData.success) {
-        setAllSessions(sessionsData.data.map((s: any) => ({
-          ...s,
-          startTime: new Date(s.startTime),
-          endTime: new Date(s.endTime),
-        })))
-      }
+        const sessionsResponse = await fetch(sessionsUrl.toString(), { headers })
+        const sessionsData = await sessionsResponse.json()
+        if (sessionsData.success) {
+          setAllSessions(sessionsData.data.map((s: any) => ({
+            ...s,
+            startTime: new Date(s.startTime),
+            endTime: new Date(s.endTime),
+          })))
+        }
 
-      // Cargar usuarios únicos
-      const statsUrl = new URL('/api/tracking/stats', window.location.origin)
-      statsUrl.searchParams.set('startDate', startDateObj.toISOString())
-      statsUrl.searchParams.set('endDate', endDateObj.toISOString())
-      
-      const usersResponse = await fetch(statsUrl.toString(), { headers })
-      const usersData = await usersResponse.json()
-      if (usersData.success) {
-        // Obtener usuarios únicos de las sesiones
-        const uniqueUsersSet = new Set<string>()
-        sessionsData.data.forEach((s: any) => uniqueUsersSet.add(s.appUsername))
-        setAllUsers(Array.from(uniqueUsersSet))
-      }
+        // Cargar usuarios únicos
+        const statsUrl = new URL('/api/tracking/stats', window.location.origin)
+        statsUrl.searchParams.set('startDate', startDateObj.toISOString())
+        statsUrl.searchParams.set('endDate', endDateObj.toISOString())
+        
+        const usersResponse = await fetch(statsUrl.toString(), { headers })
+        const usersData = await usersResponse.json()
+        if (usersData.success) {
+          // Obtener usuarios únicos de las sesiones
+          const uniqueUsersSet = new Set<string>()
+          sessionsData.data.forEach((s: any) => uniqueUsersSet.add(s.appUsername))
+          setAllUsers(Array.from(uniqueUsersSet))
+        }
 
       // Actualizar timestamp de última actualización
       setLastUpdate(new Date())
-    } catch (error) {
-      console.error('Error loading data:', error)
-    } finally {
-      setLoading(false)
+      } catch (error) {
+        console.error('Error loading data:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-  }
 
   // Cargar datos cuando cambian los filtros
   useEffect(() => {
     loadData()
   }, [startDateObj, endDateObj, selectedUser])
 
-  // Cargar estadísticas de inferencia al montar
+  // Cargar estadísticas de inferencia cuando cambian los filtros
   useEffect(() => {
     loadInferenceStats()
-  }, [])
+  }, [loadInferenceStats])
 
   // Obtener release dates únicos de las sesiones
   const availableReleaseDates = useMemo(() => {
@@ -552,22 +622,22 @@ export default function DashboardPage() {
           >
             {user && (
               <>
-                <div
-                  style={{
-                    padding: '0.5rem 0.75rem',
-                    background: 'var(--muted)',
-                    borderRadius: '6px',
-                    color: 'var(--foreground)',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
+              <div
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  background: 'var(--muted)',
+                  borderRadius: '6px',
+                  color: 'var(--foreground)',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     maxWidth: '150px',
-                  }}
-                >
-                  {user.username}
-                </div>
+                }}
+              >
+                {user.username}
+              </div>
                 <Link
                   href="/docs"
                   target="_blank"
@@ -649,48 +719,6 @@ export default function DashboardPage() {
             margin: '0 auto',
           }}
         >
-          {/* Cards de estadísticas de inferencia - Minimalistas y completas */}
-          {inferenceStats && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '0.875rem',
-                marginBottom: '1.5rem',
-                maxWidth: '700px',
-              }}
-            >
-              <MinimalStatCard
-                title="Tiempo Promedio"
-                value={inferenceStats.average}
-                description={`de ${inferenceStats.total} evaluaciones`}
-                color="var(--primary)"
-                loading={loadingStats}
-              />
-              {inferenceStats.maxPair && (
-                <MinimalStatCard
-                  title="Tiempo Máximo"
-                  value={inferenceStats.max}
-                  description="inferencia más lenta"
-                  color="var(--destructive)"
-                  loading={loadingStats}
-                  onClick={() => loadSessionForModal(inferenceStats.maxPair!.sessionId)}
-                  clickable
-                />
-              )}
-              {inferenceStats.minPair && (
-                <MinimalStatCard
-                  title="Tiempo Mínimo"
-                  value={inferenceStats.min}
-                  description="inferencia más rápida"
-                  color="var(--accent)"
-                  loading={loadingStats}
-                  onClick={() => loadSessionForModal(inferenceStats.minPair!.sessionId)}
-                  clickable
-                />
-              )}
-            </div>
-          )}
 
           {/* Filtros y métricas en la misma línea */}
           <div
@@ -1078,14 +1106,14 @@ export default function DashboardPage() {
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               </div>
-            </div>
+          </div>
 
           </div>
 
           {/* Badges de filtros activos y botón limpiar */}
-          <div
-            style={{
-              marginBottom: '1.5rem',
+            <div
+              style={{
+                marginBottom: '1.5rem',
               display: 'flex',
               gap: '0.75rem',
               alignItems: 'center',
@@ -1097,19 +1125,19 @@ export default function DashboardPage() {
                 {selectedUser && (
                   <div
                     style={{
-                      padding: '0.5rem 0.75rem',
-                      background: 'var(--primary)',
-                      color: 'var(--primary-foreground)',
-                      borderRadius: '6px',
-                      fontSize: '0.875rem',
+                padding: '0.5rem 0.75rem',
+                background: 'var(--primary)',
+                color: 'var(--primary-foreground)',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.5rem',
-                    }}
-                  >
+              }}
+            >
                     <span>Usuario: <strong>{selectedUser}</strong></span>
-                  </div>
-                )}
+            </div>
+          )}
                 {selectedReleaseDate && (
                   <div
                     style={{
@@ -1174,28 +1202,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Estadísticas pequeñas y discretas */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center',
-              marginBottom: '1rem',
-              padding: '0.5rem 0',
-            }}
-          >
-            <CompactMetricCard
-              title="Sesiones"
-              value={totalSessions}
-              color="var(--primary)"
-            />
-            <CompactMetricCard
-              title="Usuarios"
-              value={uniqueUsers}
-              color="var(--primary)"
-            />
-          </div>
-
           {/* Últimas sesiones en formato de cards */}
           <div
             style={{
@@ -1211,11 +1217,12 @@ export default function DashboardPage() {
                 padding: '1.5rem',
                 borderBottom: '1px solid var(--border)',
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                flexDirection: 'column',
+                gap: '1rem',
               }}
             >
-              <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 auto', minWidth: '200px' }}>
                 <h2
                   style={{
                     fontSize: '1.125rem',
@@ -1234,14 +1241,14 @@ export default function DashboardPage() {
                   }}
                 >
                   {latestSessions.length} {latestSessions.length === 1 ? 'sesión' : 'sesiones'} en el rango seleccionado
-                  {lastUpdate && (
-                    <span style={{ marginLeft: '0.75rem' }}>
-                      • Actualizado {timeAgo}
-                    </span>
-                  )}
+                    {lastUpdate && (
+                      <span style={{ marginLeft: '0.75rem' }}>
+                        • Actualizado {timeAgo}
+                      </span>
+                    )}
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <button
                   onClick={loadData}
                   disabled={loading}
@@ -1309,6 +1316,51 @@ export default function DashboardPage() {
                     </>
                   )}
                 </button>
+                <CompactMetricCard
+                  title="Sesiones"
+                  value={totalSessions}
+                  color="var(--primary)"
+                />
+                <CompactMetricCard
+                  title="Usuarios"
+                  value={uniqueUsers}
+                  color="var(--primary)"
+                />
+                {inferenceStats && (
+                  <>
+                    <CompactTimeStatCard
+                      title="Inf. Promedio"
+                      value={inferenceStats.average}
+                      description={`${inferenceStats.total} eval`}
+                      color="var(--primary)"
+                      loading={loadingStats}
+                    />
+                    {inferenceStats.minPair && (
+                      <CompactTimeStatCard
+                        title="Inf. Mínimo"
+                        value={inferenceStats.min}
+                        description="más rápido"
+                        color="#22c55e"
+                        loading={loadingStats}
+                        onClick={() => loadSessionForModal(inferenceStats.minPair!.sessionId)}
+                        clickable
+                      />
+                    )}
+                    {inferenceStats.maxPair && (
+                      <CompactTimeStatCard
+                        title="Inf. Máximo"
+                        value={inferenceStats.max}
+                        description="más lento"
+                        color="#ef4444"
+                        loading={loadingStats}
+                        onClick={() => loadSessionForModal(inferenceStats.maxPair!.sessionId)}
+                        clickable
+                        isNegative
+                      />
+                    )}
+                  </>
+                )}
+                </div>
               </div>
             </div>
             <div style={{ padding: '1rem' }}>
@@ -1514,38 +1566,170 @@ function CompactMetricCard({ title, value, color }: {
   return (
     <div
       style={{
-        padding: '0.25rem 0.5rem',
-        background: 'transparent',
-        borderRadius: '4px',
-        border: 'none',
-        boxShadow: 'none',
-        minWidth: 'auto',
-        flex: '0 0 auto',
+        padding: '0.5rem 0.75rem',
+        background: 'var(--card)',
+        borderRadius: '6px',
+        border: '1px solid var(--border)',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+        minWidth: '70px',
+        maxWidth: '100px',
+        flex: '1 1 auto',
         display: 'flex',
-        alignItems: 'center',
-        gap: '0.375rem',
+        flexDirection: 'column',
+        gap: '0.25rem',
       }}
     >
       <div
         style={{
           fontSize: '0.625rem',
           color: 'var(--muted-foreground)',
-          fontWeight: 400,
-          lineHeight: 1,
+          fontWeight: 500,
+          textTransform: 'uppercase',
+          letterSpacing: '0.3px',
+          lineHeight: 1.2,
+          textAlign: 'center',
         }}
       >
-        {title}:
+        {title}
       </div>
       <div
         style={{
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          color: 'var(--muted-foreground)',
+          fontSize: '0.875rem',
+          fontWeight: 700,
+          color: color,
           lineHeight: 1,
+          textAlign: 'center',
         }}
       >
         {value.toLocaleString()}
       </div>
+    </div>
+  )
+}
+
+function CompactTimeStatCard({ 
+  title, 
+  value, 
+  description, 
+  color, 
+  loading, 
+  onClick,
+  clickable,
+  isNegative
+}: {
+  title: string
+  value: number
+  description?: string
+  color: string
+  loading?: boolean
+  onClick?: () => void
+  clickable?: boolean
+  isNegative?: boolean
+}) {
+  const formatDuration = (ms: number): string => {
+    if (ms < 1000) {
+      return `${Math.round(ms)}ms`
+    } else if (ms < 60000) {
+      return `${(ms / 1000).toFixed(1)}s`
+    } else {
+      const minutes = Math.floor(ms / 60000)
+      const seconds = ((ms % 60000) / 1000).toFixed(1)
+      return `${minutes}m ${seconds}s`
+    }
+  }
+
+  const isDestructive = color === 'var(--destructive)' || isNegative
+  
+  return (
+    <div
+      onClick={clickable && onClick ? onClick : undefined}
+      style={{
+        padding: '0.5rem 0.75rem',
+        background: 'var(--card)',
+        borderRadius: '6px',
+        border: `2px solid ${color}`,
+        boxShadow: clickable 
+          ? `0 1px 3px ${color}15, 0 1px 2px rgba(0,0,0,0.05)`
+          : `0 1px 2px ${color}10`,
+        minWidth: '70px',
+        maxWidth: '100px',
+        flex: '1 1 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.25rem',
+        cursor: clickable ? 'pointer' : 'default',
+        transition: 'all 0.2s ease',
+        position: 'relative',
+      }}
+      onMouseEnter={(e) => {
+        if (clickable) {
+          e.currentTarget.style.transform = 'translateY(-1px)'
+          e.currentTarget.style.boxShadow = `0 2px 8px ${color}25, 0 1px 3px rgba(0,0,0,0.08)`
+          e.currentTarget.style.borderColor = color
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (clickable) {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = `0 1px 2px ${color}10`
+        }
+      }}
+    >
+      {/* Indicador de clickeable */}
+      {clickable && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '0.375rem',
+            right: '0.375rem',
+            width: '4px',
+            height: '4px',
+            borderRadius: '50%',
+            background: color,
+            opacity: 0.4,
+          }}
+        />
+      )}
+      
+      <div
+        style={{
+          fontSize: '0.625rem',
+          color: 'var(--muted-foreground)',
+          fontWeight: 500,
+          textTransform: 'uppercase',
+          letterSpacing: '0.3px',
+          lineHeight: 1.2,
+          textAlign: 'center',
+        }}
+      >
+        {title}
+      </div>
+      
+      <div
+        style={{
+          fontSize: '0.875rem',
+          fontWeight: 700,
+          color: 'var(--foreground)',
+          lineHeight: 1,
+          textAlign: 'center',
+        }}
+      >
+        {loading ? '...' : formatDuration(value)}
+      </div>
+      
+      {description && (
+        <div
+          style={{
+            fontSize: '0.5625rem',
+            color: 'var(--muted-foreground)',
+            lineHeight: 1.2,
+            opacity: 0.8,
+            textAlign: 'center',
+          }}
+        >
+          {description}
+        </div>
+      )}
     </div>
   )
 }
@@ -2717,31 +2901,31 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
             }}
           >
             {session.duration > 0 && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.8125rem',
-                  color: 'var(--muted-foreground)',
-                }}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.8125rem',
+                color: 'var(--muted-foreground)',
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ opacity: 0.7 }}
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ opacity: 0.7 }}
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                <span>{formatDuration(session.duration)}</span>
-              </div>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>{formatDuration(session.duration)}</span>
+            </div>
             )}
             {session.deviceInfo?.releaseDate && (
               <div

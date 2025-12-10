@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const appUsername = searchParams.get('appUsername')
 
     let allEvents
     if (startDate && endDate) {
@@ -34,6 +35,11 @@ export async function GET(request: NextRequest) {
       const startDateDefault = new Date()
       startDateDefault.setDate(startDateDefault.getDate() - 30)
       allEvents = await getEventsByDateRange(startDateDefault, endDateDefault)
+    }
+
+    // Filtrar por appUsername si se proporciona
+    if (appUsername) {
+      allEvents = allEvents.filter(e => e.appUsername === appUsername)
     }
 
     // Filtrar eventos de inferencia
