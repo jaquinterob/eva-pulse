@@ -4,6 +4,7 @@ import { useState, FormEvent, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/hooks/useAuth'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import EvaPulseIcon from '@/components/ui/EvaPulseIcon'
 
 export default function Home() {
   const router = useRouter()
@@ -99,17 +100,34 @@ export default function Home() {
           boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)',
         }}
       >
-        <h1
+        <div
           style={{
-            fontSize: 'clamp(1.5rem, 5vw, 2rem)',
-            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.75rem',
             marginBottom: '0.5rem',
-            color: 'var(--foreground)',
-            textAlign: 'center',
           }}
         >
-          Eva Pulse
-        </h1>
+          <EvaPulseIcon 
+            size={32} 
+            style={{ 
+              opacity: 0.9,
+              color: 'var(--primary)',
+            }} 
+          />
+          <h1
+            style={{
+              fontSize: 'clamp(1.5rem, 5vw, 2rem)',
+              fontWeight: 'bold',
+              margin: 0,
+              color: 'var(--foreground)',
+              textAlign: 'center',
+            }}
+          >
+            Eva Pulse
+          </h1>
+        </div>
         <p
           style={{
             marginBottom: '1.5rem',

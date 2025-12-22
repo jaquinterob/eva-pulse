@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import EvaPulseIcon from '@/components/ui/EvaPulseIcon'
 
 export default function DocsPage() {
   return (
@@ -34,8 +35,17 @@ export default function DocsPage() {
             fontWeight: 600,
             color: 'var(--foreground)',
             textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
           }}
         >
+          <EvaPulseIcon 
+            size={20} 
+            style={{ 
+              opacity: 0.85,
+            }} 
+          />
           Eva Pulse
         </Link>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/hooks/useAuth'
 import AuthGuard from '@/components/AuthGuard'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import EvaPulseIcon from '@/components/ui/EvaPulseIcon'
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 
 // Tipos compatibles con los datos de la API
@@ -574,6 +575,13 @@ export default function DashboardPage() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: '1 1 auto', minWidth: 0 }}>
+            <EvaPulseIcon 
+              size={20} 
+              style={{ 
+                opacity: 0.85,
+                flexShrink: 0,
+              }} 
+            />
             <h1
               style={{
                 fontSize: 'clamp(1rem, 4vw, 1.25rem)',

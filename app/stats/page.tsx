@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/hooks/useAuth'
 import AuthGuard from '@/components/AuthGuard'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import EvaPulseIcon from '@/components/ui/EvaPulseIcon'
 import { useState, useEffect, useMemo, useRef } from 'react'
 
 interface InferenceStats {
@@ -231,6 +232,13 @@ export default function StatsPage() {
               minWidth: 0,
             }}
           >
+            <EvaPulseIcon 
+              size={20} 
+              style={{ 
+                opacity: 0.85,
+                flexShrink: 0,
+              }} 
+            />
             <h1
               style={{
                 fontSize: 'clamp(1rem, 4vw, 1.25rem)',

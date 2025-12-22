@@ -9,20 +9,10 @@ export async function GET() {
   fill="none"
   xmlns="http://www.w3.org/2000/svg"
 >
-  <defs>
-    <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#667eea" />
-      <stop offset="1" stopColor="#764ba2" />
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="6" fill="url(#gradient)" />
-  <path
-    d="M6 16h3l1.5-6 3 12 1.5-6h3"
-    stroke="white"
-    strokeWidth="2.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  />
+  <!-- Punto con Onda: círculos concéntricos que se expanden desde el centro, sin fondo -->
+  <circle cx="16" cy="16" r="8" stroke="#10b981" strokeWidth="2" fill="none" opacity="0.5" />
+  <circle cx="16" cy="16" r="5" stroke="#10b981" strokeWidth="2" fill="none" opacity="0.7" />
+  <circle cx="16" cy="16" r="3" fill="#10b981" opacity="1" />
 </svg>`
 
   return new NextResponse(svg, {

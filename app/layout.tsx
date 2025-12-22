@@ -5,6 +5,11 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Eva Pulse',
   description: 'Aplicación monolítica con Next.js y TypeScript',
+  icons: {
+    icon: '/icon',
+    shortcut: '/icon',
+    apple: '/icon',
+  },
   viewport: {
     width: 'device-width',
     initialScale: 1,

@@ -1,11 +1,9 @@
-import { Metadata } from 'next'
+'use client'
+
 import Link from 'next/link'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import DatabaseStatus from '@/components/ui/DatabaseStatus'
-
-export const metadata: Metadata = {
-  title: 'Inicio - Eva Pulse',
-}
+import EvaPulseIcon from '@/components/ui/EvaPulseIcon'
 
 export default function HomePage() {
   return (
@@ -37,16 +35,33 @@ export default function HomePage() {
           maxWidth: '800px',
         }}
       >
-        <h1
+        <div
           style={{
-            fontSize: '3rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '1rem',
             marginBottom: '1rem',
-            fontWeight: 'bold',
-            color: 'var(--primary-foreground)',
           }}
         >
-          Eva Pulse
-        </h1>
+          <EvaPulseIcon 
+            size={48} 
+            style={{ 
+              opacity: 0.95,
+              color: 'var(--primary-foreground)',
+            }} 
+          />
+          <h1
+            style={{
+              fontSize: '3rem',
+              margin: 0,
+              fontWeight: 'bold',
+              color: 'var(--primary-foreground)',
+            }}
+          >
+            Eva Pulse
+          </h1>
+        </div>
         <p
           style={{
             fontSize: '1.25rem',

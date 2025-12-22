@@ -4,6 +4,7 @@ import { useState, FormEvent, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/hooks/useAuth'
+import EvaPulseIcon from '@/components/ui/EvaPulseIcon'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -85,17 +86,33 @@ export default function LoginPage() {
           boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)',
         }}
       >
-        <h1
+        <div
           style={{
-            fontSize: '2rem',
-            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.75rem',
             marginBottom: '0.5rem',
-            color: 'var(--foreground)',
-            textAlign: 'center',
           }}
         >
-          Iniciar Sesión
-        </h1>
+          <EvaPulseIcon 
+            size={28} 
+            style={{ 
+              opacity: 0.9,
+            }} 
+          />
+          <h1
+            style={{
+              fontSize: '2rem',
+              fontWeight: 'bold',
+              margin: 0,
+              color: 'var(--foreground)',
+              textAlign: 'center',
+            }}
+          >
+            Iniciar Sesión
+          </h1>
+        </div>
         <p
           style={{
             marginBottom: '2rem',
