@@ -9,6 +9,11 @@ import EvaPulseIcon from '@/components/ui/EvaPulseIcon'
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 
 // Tipos compatibles con los datos de la API
+interface InferenceData {
+  duration: number // Tiempo de inferencia en milisegundos
+  placa?: string // Placa de la evaluación
+}
+
 interface TrackingSession {
   sessionId: string
   appUsername: string
@@ -22,6 +27,7 @@ interface TrackingSession {
     releaseDate?: string
   }
   isActive: boolean
+  inferences?: InferenceData[] // Array de datos de inferencias individuales
 }
 
 interface TrackingEvent {
@@ -296,11 +302,101 @@ export default function DashboardPage() {
         const sessionsResponse = await fetch(sessionsUrl.toString(), { headers })
         const sessionsData = await sessionsResponse.json()
         if (sessionsData.success) {
-          setAllSessions(sessionsData.data.map((s: any) => ({
-            ...s,
-            startTime: new Date(s.startTime),
-            endTime: new Date(s.endTime),
-          })))
+          // Calcular tiempo de inferencia promedio para cada sesión
+          const sessionsWithInference = await Promise.all(
+            sessionsData.data.map(async (s: any) => {
+              // Obtener eventos de inferencia para esta sesión
+              const eventsUrl = new URL('/api/tracking/events', window.location.origin)
+              eventsUrl.searchParams.set('sessionId', s.sessionId)
+              
+              try {
+                const eventsResponse = await fetch(eventsUrl.toString(), { headers })
+                const eventsData = await eventsResponse.json()
+                
+                if (eventsData.success && eventsData.data) {
+                  const events = eventsData.data
+                  
+                  // Filtrar eventos de inferencia
+                  const inferenceStarts = events.filter(
+                    (e: any) =>
+                      e.eventName?.toLowerCase().includes('inference') &&
+                      (e.eventName?.toLowerCase().includes('start') ||
+                        e.eventName?.toLowerCase().includes('inicio'))
+                  )
+                  
+                  const inferenceResponses = events.filter(
+                    (e: any) =>
+                      e.eventName?.toLowerCase().includes('inference') &&
+                      (e.eventName?.toLowerCase().includes('response') ||
+                        e.eventName?.toLowerCase().includes('respuesta') ||
+                        e.eventName?.toLowerCase().includes('end') ||
+                        e.eventName?.toLowerCase().includes('fin'))
+                  )
+                  
+                  // Calcular duraciones de inferencia individuales con placas
+                  const inferenceData: InferenceData[] = []
+                  const processedStarts = new Set<string>()
+                  
+                  for (const start of inferenceStarts) {
+                    if (processedStarts.has(start.eventId)) continue
+                    
+                    const matchingResponse = inferenceResponses
+                      .filter(
+                        (r: any) =>
+                          r.sessionId === start.sessionId &&
+                          new Date(r.timestamp) > new Date(start.timestamp) &&
+                          !processedStarts.has(r.eventId)
+                      )
+                      .sort((a: any, b: any) => 
+                        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                      )[0]
+                    
+                    if (matchingResponse) {
+                      const duration =
+                        new Date(matchingResponse.timestamp).getTime() -
+                        new Date(start.timestamp).getTime()
+                      
+                      if (duration > 0) {
+                        // Extraer placa de las propiedades del evento de inicio o respuesta
+                        const placa = 
+                          start.properties?.placa || 
+                          start.properties?.plate || 
+                          start.properties?.licensePlate ||
+                          matchingResponse.properties?.placa ||
+                          matchingResponse.properties?.plate ||
+                          matchingResponse.properties?.licensePlate ||
+                          undefined
+                        
+                        inferenceData.push({
+                          duration,
+                          placa: placa ? String(placa) : undefined,
+                        })
+                        processedStarts.add(start.eventId)
+                      }
+                    }
+                  }
+                  
+                  return {
+                    ...s,
+                    startTime: new Date(s.startTime),
+                    endTime: new Date(s.endTime),
+                    inferences: inferenceData.length > 0 ? inferenceData : undefined,
+                  }
+                }
+              } catch (error) {
+                console.error(`Error calculating inference time for session ${s.sessionId}:`, error)
+              }
+              
+              return {
+                ...s,
+                startTime: new Date(s.startTime),
+                endTime: new Date(s.endTime),
+                inferences: undefined,
+              }
+            })
+          )
+          
+          setAllSessions(sessionsWithInference)
         }
 
         // Cargar usuarios únicos
@@ -2768,6 +2864,18 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
   formatDuration: (seconds: number) => string
   onClick: () => void
 }) {
+  // Función para formatear tiempo de inferencia
+  const formatInferenceTime = (ms: number): string => {
+    if (ms < 1000) {
+      return `${Math.round(ms)}ms`
+    } else if (ms < 60000) {
+      return `${(ms / 1000).toFixed(1)}s`
+    } else {
+      const minutes = Math.floor(ms / 60000)
+      const seconds = ((ms % 60000) / 1000).toFixed(1)
+      return `${minutes}m ${seconds}s`
+    }
+  }
   // Función para obtener el icono y nombre del SO
   const getPlatformInfo = (platform: string) => {
     const platformLower = platform.toLowerCase()
@@ -2841,7 +2949,7 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           gap: '0.75rem',
           flexWrap: 'wrap',
         }}
@@ -2997,23 +3105,88 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
             </div>
           </div>
         </div>
-        <div>
-          <span
+        {session.inferences && session.inferences.length > 0 && (
+          <div
             style={{
-              padding: '0.375rem 0.875rem',
-              borderRadius: '12px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              background: session.isActive ? 'var(--muted)' : 'var(--muted)',
-              color: session.isActive ? 'var(--foreground)' : 'var(--muted-foreground)',
-              border: session.isActive ? '1px solid var(--border)' : 'none',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '0.5rem',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              justifyContent: 'flex-end',
             }}
           >
-            {session.isActive ? 'Activa' : 'Finalizada'}
-          </span>
-        </div>
+            {session.inferences.map((inference, index) => (
+              <div
+                key={index}
+                style={{
+                  display: 'inline-flex',
+                  flexDirection: 'column',
+                  gap: '0.25rem',
+                  fontSize: '0.75rem',
+                  padding: '0.4rem 0.7rem',
+                  background: 'var(--card)',
+                  borderRadius: '6px',
+                  color: 'var(--foreground)',
+                  border: '1.5px solid var(--primary)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  fontWeight: 500,
+                  minWidth: 'fit-content',
+                  alignItems: 'center',
+                }}
+                title={`Inferencia ${index + 1}: ${formatInferenceTime(inference.duration)}${inference.placa ? ` - Placa: ${inference.placa}` : ''}`}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--primary)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span style={{ fontWeight: 600, letterSpacing: '0.2px' }}>
+                    {formatInferenceTime(inference.duration)}
+                  </span>
+                </div>
+                {inference.placa && (() => {
+                  // Formatear placa estilo Colombia (ABC-123 o ABC-ABC)
+                  const placaFormateada = (() => {
+                    const placa = String(inference.placa).toUpperCase().replace(/[^A-Z0-9]/g, '')
+                    if (placa.length >= 6) {
+                      return `${placa.substring(0, 3)}-${placa.substring(3, 6)}`
+                    }
+                    return placa
+                  })()
+                  
+                  return (
+                    <div
+                      style={{
+                        fontSize: '0.6875rem',
+                        fontWeight: 700,
+                        color: '#000',
+                        letterSpacing: '0.4px',
+                        textTransform: 'uppercase',
+                        background: '#FFD700',
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '4px',
+                        border: '1px solid #FFA500',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {placaFormateada}
+                    </div>
+                  )
+                })()}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
