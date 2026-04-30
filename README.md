@@ -84,7 +84,7 @@ La aplicación incluye un sistema de tema completo con:
 
 ## 📚 Documentación
 
-- `CODING_STANDARDS.md` - Estándares de código del proyecto
-- `DEPLOYMENT.md` - Guía de despliegue en VPS
-- `MONGODB_SETUP.md` - Configuración de MongoDB
+- `.cursor/CODING_STANDARDS.md` - Estándares de código del proyecto
+- `DEPLOY.md` - Despliegue en VPS (Docker, PM2, Nginx, TLS, systemd)
+- `.cursor/MONGODB_SETUP.md` - Configuración de MongoDB (referencia en repo)
 
