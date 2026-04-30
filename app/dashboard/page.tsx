@@ -116,6 +116,13 @@ export default function DashboardPage() {
   } | null>(null)
   const [loadingStats, setLoadingStats] = useState(false)
 
+  // Estado para paginación e infinite scroll
+  const [isMobile, setIsMobile] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [loadedItems, setLoadedItems] = useState(10) // Para infinite scroll
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
   function handleLogout() {
     logout()
     router.push('/')
@@ -598,12 +605,90 @@ export default function DashboardPage() {
     return new Set(filteredSessions.map(s => s.appUsername)).size
   }, [filteredSessions])
 
-  // Últimas sesiones (ordenadas por fecha, más recientes primero)
-  const latestSessions = useMemo(() => {
+  // Detectar si es móvil
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+      // Calcular cuántas cards caben por pantalla (aproximadamente)
+      if (window.innerWidth >= 768) {
+        // Desktop: calcular basado en altura de card (~150px) y altura de viewport
+        const cardHeight = 150
+        const viewportHeight = window.innerHeight - 400 // Restar espacio de header y filtros
+        const cardsPerView = Math.max(3, Math.floor(viewportHeight / cardHeight))
+        setItemsPerPage(cardsPerView)
+      } else {
+        // Mobile: calcular basado en altura de card y viewport
+        const cardHeight = 180
+        const viewportHeight = window.innerHeight - 300
+        const cardsPerView = Math.max(2, Math.floor(viewportHeight / cardHeight))
+        setItemsPerPage(cardsPerView)
+        setLoadedItems(cardsPerView)
+      }
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Resetear paginación cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+    setLoadedItems(itemsPerPage)
+  }, [filteredSessions, itemsPerPage])
+
+  // Sesiones ordenadas
+  const sortedSessions = useMemo(() => {
     return [...filteredSessions]
       .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-      .slice(0, 10)
   }, [filteredSessions])
+
+  // Sesiones a mostrar según dispositivo
+  const latestSessions = useMemo(() => {
+    if (isMobile) {
+      // Infinite scroll: mostrar hasta loadedItems
+      return sortedSessions.slice(0, loadedItems)
+    } else {
+      // Paginación: mostrar según página actual
+      const startIndex = (currentPage - 1) * itemsPerPage
+      const endIndex = startIndex + itemsPerPage
+      return sortedSessions.slice(startIndex, endIndex)
+    }
+  }, [sortedSessions, isMobile, currentPage, itemsPerPage, loadedItems])
+
+  // Calcular total de páginas (solo para desktop)
+  const totalPages = useMemo(() => {
+    if (isMobile) return 0
+    return Math.ceil(sortedSessions.length / itemsPerPage)
+  }, [sortedSessions.length, itemsPerPage, isMobile])
+
+  // Función para cargar más items (infinite scroll)
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !isMobile) return
+    if (loadedItems >= sortedSessions.length) return
+
+    setIsLoadingMore(true)
+    // Simular carga con un pequeño delay
+    setTimeout(() => {
+      setLoadedItems(prev => Math.min(prev + itemsPerPage, sortedSessions.length))
+      setIsLoadingMore(false)
+    }, 300)
+  }, [isMobile, isLoadingMore, loadedItems, sortedSessions.length, itemsPerPage])
+
+  // Observer para infinite scroll
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadMoreRef = useCallback((node: HTMLDivElement | null) => {
+    if (isLoadingMore) return
+    if (observerRef.current) observerRef.current.disconnect()
+    
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && loadedItems < sortedSessions.length) {
+        loadMore()
+      }
+    })
+    
+    if (node) observerRef.current.observe(node)
+  }, [isLoadingMore, loadedItems, sortedSessions.length, loadMore])
 
   const formatDate = (date: Date): string => {
     return new Date(date).toLocaleString('es-ES', {
@@ -1494,6 +1579,208 @@ export default function DashboardPage() {
                       onClick={() => setSelectedSessionForTimeline(session)}
                     />
                   ))}
+                </div>
+              )}
+              
+              {/* Controles de paginación (Desktop) */}
+              {!isMobile && totalPages > 1 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '1.5rem 1rem',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: currentPage === 1 ? 'var(--muted)' : 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      color: currentPage === 1 ? 'var(--muted-foreground)' : 'var(--foreground)',
+                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      transition: 'all 0.2s',
+                      opacity: currentPage === 1 ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentPage !== 1) {
+                        e.currentTarget.style.background = 'var(--accent)'
+                        e.currentTarget.style.borderColor = 'var(--primary)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (currentPage !== 1) {
+                        e.currentTarget.style.background = 'var(--card)'
+                        e.currentTarget.style.borderColor = 'var(--border)'
+                      }
+                    }}
+                  >
+                    Anterior
+                  </button>
+                  
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.25rem',
+                      alignItems: 'center',
+                    }}
+                  >
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum: number
+                      if (totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i
+                      } else {
+                        pageNum = currentPage - 2 + i
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          style={{
+                            minWidth: '2.5rem',
+                            height: '2.5rem',
+                            padding: '0.5rem',
+                            background: currentPage === pageNum ? 'var(--primary)' : 'var(--card)',
+                            border: `1px solid ${currentPage === pageNum ? 'var(--primary)' : 'var(--border)'}`,
+                            borderRadius: '6px',
+                            color: currentPage === pageNum ? 'white' : 'var(--foreground)',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: currentPage === pageNum ? 600 : 500,
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentPage !== pageNum) {
+                              e.currentTarget.style.background = 'var(--accent)'
+                              e.currentTarget.style.borderColor = 'var(--primary)'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (currentPage !== pageNum) {
+                              e.currentTarget.style.background = 'var(--card)'
+                              e.currentTarget.style.borderColor = 'var(--border)'
+                            }
+                          }}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: currentPage === totalPages ? 'var(--muted)' : 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      color: currentPage === totalPages ? 'var(--muted-foreground)' : 'var(--foreground)',
+                      cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      transition: 'all 0.2s',
+                      opacity: currentPage === totalPages ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentPage !== totalPages) {
+                        e.currentTarget.style.background = 'var(--accent)'
+                        e.currentTarget.style.borderColor = 'var(--primary)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (currentPage !== totalPages) {
+                        e.currentTarget.style.background = 'var(--card)'
+                        e.currentTarget.style.borderColor = 'var(--border)'
+                      }
+                    }}
+                  >
+                    Siguiente
+                  </button>
+                  
+                  <div
+                    style={{
+                      fontSize: '0.875rem',
+                      color: 'var(--muted-foreground)',
+                      marginLeft: '1rem',
+                    }}
+                  >
+                    Página {currentPage} de {totalPages}
+                  </div>
+                </div>
+              )}
+              
+              {/* Infinite scroll trigger (Mobile) */}
+              {isMobile && loadedItems < sortedSessions.length && (
+                <div
+                  ref={loadMoreRef}
+                  style={{
+                    padding: '1.5rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  {isLoadingMore ? (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        color: 'var(--muted-foreground)',
+                      }}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ animation: 'spin 1s linear infinite' }}
+                      >
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                      </svg>
+                      Cargando más...
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        color: 'var(--muted-foreground)',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      Mostrando {loadedItems} de {sortedSessions.length} sesiones
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Indicador de fin (Mobile) */}
+              {isMobile && loadedItems >= sortedSessions.length && sortedSessions.length > 0 && (
+                <div
+                  style={{
+                    padding: '1.5rem',
+                    textAlign: 'center',
+                    color: 'var(--muted-foreground)',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Has visto todas las sesiones ({sortedSessions.length})
                 </div>
               )}
             </div>
