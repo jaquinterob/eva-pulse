@@ -37,6 +37,7 @@ export function useTheme() {
       root.style.setProperty(key, value)
     })
 
+    root.dataset.theme = newTheme
     root.classList.remove('light', 'dark')
     root.classList.add(newTheme)
   }

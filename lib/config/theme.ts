@@ -20,6 +20,15 @@ export interface ThemeColors {
   popoverForeground: string
   destructive: string
   destructiveForeground: string
+  error: string
+  errorForeground: string
+  errorMuted: string
+  errorBorder: string
+  errorText: string
+  errorSubtle: string
+  plateBg: string
+  plateText: string
+  plateBorder: string
 }
 
 export interface ThemeConfig {
@@ -60,6 +69,15 @@ export const themeConfig: ThemeConfig = {
     // Destructive - gris muy oscuro (casi negro)
     destructive: '#171717',
     destructiveForeground: '#ffffff',
+    error: '#c2410c',
+    errorForeground: '#ffffff',
+    errorMuted: '#ffedd5',
+    errorBorder: '#f97316',
+    errorText: '#9a3412',
+    errorSubtle: 'rgba(154, 52, 18, 0.14)',
+    plateBg: '#fef08a',
+    plateText: '#1c1917',
+    plateBorder: '#f59e0b',
   },
   dark: {
     // Fondo principal - negro puro
@@ -93,6 +111,15 @@ export const themeConfig: ThemeConfig = {
     // Destructive - gris claro (casi blanco)
     destructive: '#d4d4d4',
     destructiveForeground: '#000000',
+    error: '#f97316',
+    errorForeground: '#0a0a0a',
+    errorMuted: 'rgba(249, 115, 22, 0.14)',
+    errorBorder: 'rgba(251, 146, 60, 0.35)',
+    errorText: '#fdba74',
+    errorSubtle: 'rgba(249, 115, 22, 0.14)',
+    plateBg: '#ca8a04',
+    plateText: '#fef9c3',
+    plateBorder: '#fbbf24',
   },
 }
 
@@ -123,6 +150,15 @@ export function getCSSVariables(colors: ThemeColors): Record<string, string> {
     '--popover-foreground': colors.popoverForeground,
     '--destructive': colors.destructive,
     '--destructive-foreground': colors.destructiveForeground,
+    '--error': colors.error,
+    '--error-foreground': colors.errorForeground,
+    '--error-muted': colors.errorMuted,
+    '--error-border': colors.errorBorder,
+    '--error-text': colors.errorText,
+    '--error-subtle': colors.errorSubtle,
+    '--plate-bg': colors.plateBg,
+    '--plate-text': colors.plateText,
+    '--plate-border': colors.plateBorder,
   }
 }
 

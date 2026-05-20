@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { ThemeProvider } from '@/components/ui/ThemeProvider'
+import AppVersion from '@/components/ui/AppVersion'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -33,8 +34,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('eva-pulse-theme');var t=s||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(t);}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <AppVersion />
+        </ThemeProvider>
       </body>
     </html>
   )

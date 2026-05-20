@@ -35,6 +35,10 @@ export interface TrackingEvent {
     elementId?: string
   }
   properties?: Record<string, any>
+  metadata?: {
+    error?: string
+    success?: boolean
+  }
 }
 
 // Convertir objeto plano de sesión a TrackingSession
@@ -73,7 +77,75 @@ function convertEvent(event: any): TrackingEvent {
       elementId: event.context?.elementId,
     },
     properties: event.properties || {},
+    metadata: event.metadata
+      ? {
+          error: event.metadata.error,
+          success: event.metadata.success,
+        }
+      : undefined,
   }
+}
+
+function buildErrorFilter(
+  startDate: Date,
+  endDate: Date,
+  appUsername?: string
+): Record<string, unknown> {
+  const filter: Record<string, unknown> = {
+    eventType: 'error',
+    timestamp: { $gte: startDate, $lte: endDate },
+  }
+  if (appUsername) {
+    filter.appUsername = appUsername
+  }
+  return filter
+}
+
+export async function countErrorsByDateRange(
+  startDate: Date,
+  endDate: Date,
+  appUsername?: string
+): Promise<number> {
+  await connectDB()
+  return await Event.countDocuments(buildErrorFilter(startDate, endDate, appUsername))
+}
+
+export async function getErrorsByDateRange(
+  startDate: Date,
+  endDate: Date,
+  appUsername?: string,
+  limit = 100
+): Promise<TrackingEvent[]> {
+  await connectDB()
+  const events = await Event.find(buildErrorFilter(startDate, endDate, appUsername))
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean()
+
+  return events.map(convertEvent)
+}
+
+export async function getEventsByTypeAndDateRange(
+  eventType: string,
+  startDate: Date,
+  endDate: Date,
+  appUsername?: string,
+  limit = 500
+): Promise<TrackingEvent[]> {
+  await connectDB()
+  const filter: Record<string, unknown> = {
+    eventType,
+    timestamp: { $gte: startDate, $lte: endDate },
+  }
+  if (appUsername) {
+    filter.appUsername = appUsername
+  }
+  const events = await Event.find(filter)
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean()
+
+  return events.map(convertEvent)
 }
 
 export async function getSessionsByDateRange(

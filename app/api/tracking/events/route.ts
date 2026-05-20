@@ -5,11 +5,11 @@ import {
   getEventsByUser,
   getEventsByDateRange,
   getEventsByType,
+  getEventsByTypeAndDateRange,
   createEvent,
 } from '@/lib/services/trackingService'
 
 export async function GET(request: NextRequest) {
-  // Verificar autenticación
   const user = verifyAuth(request)
   if (!user) {
     return unauthorizedResponse()
@@ -18,42 +18,49 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const sessionId = searchParams.get('sessionId')
-    const appUsername = searchParams.get('appUsername')
+    const appUsername = searchParams.get('appUsername') || undefined
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const eventType = searchParams.get('eventType')
 
     if (sessionId) {
       const events = await getEventsBySession(sessionId)
-      // Si se especifica appUsername, filtrar por él
       if (appUsername) {
         const filtered = events.filter((e) => e.appUsername === appUsername)
         return NextResponse.json({ success: true, data: filtered })
       }
-      return NextResponse.json({ success: true, data: events })
-    }
-
-    if (appUsername) {
-      const events = await getEventsByUser(appUsername)
       return NextResponse.json({ success: true, data: events })
     }
 
     if (startDate && endDate) {
-      const events = await getEventsByDateRange(
-        new Date(startDate),
-        new Date(endDate)
-      )
-      // Si se especifica appUsername, filtrar por él
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+
+      if (eventType) {
+        const events = await getEventsByTypeAndDateRange(
+          eventType,
+          start,
+          end,
+          appUsername
+        )
+        return NextResponse.json({ success: true, data: events })
+      }
+
+      const events = await getEventsByDateRange(start, end)
       if (appUsername) {
         const filtered = events.filter((e) => e.appUsername === appUsername)
         return NextResponse.json({ success: true, data: filtered })
       }
+      return NextResponse.json({ success: true, data: events })
+    }
+
+    if (appUsername && !eventType) {
+      const events = await getEventsByUser(appUsername)
       return NextResponse.json({ success: true, data: events })
     }
 
     if (eventType) {
       const events = await getEventsByType(eventType)
-      // Si se especifica appUsername, filtrar por él
       if (appUsername) {
         const filtered = events.filter((e) => e.appUsername === appUsername)
         return NextResponse.json({ success: true, data: filtered })
@@ -78,7 +85,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  // Verificar autenticación
   const user = verifyAuth(request)
   if (!user) {
     return unauthorizedResponse()
@@ -97,7 +103,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar eventType
     const validEventTypes = ['authentication', 'interaction', 'event', 'navigation', 'error']
     if (!validEventTypes.includes(body.eventType)) {
       return NextResponse.json(
@@ -109,7 +114,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Usar el username enviado desde el cliente
     const appUsername = body.appUsername.trim()
 
     const event = await createEvent({
@@ -143,4 +147,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

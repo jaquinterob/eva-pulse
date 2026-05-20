@@ -7,6 +7,7 @@ import AuthGuard from '@/components/AuthGuard'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import EvaPulseIcon from '@/components/ui/EvaPulseIcon'
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { normalizePlate, formatPlateDisplay } from '@/lib/utils/plate'
 
 // Tipos compatibles con los datos de la API
 interface InferenceData {
@@ -28,6 +29,8 @@ interface TrackingSession {
   }
   isActive: boolean
   inferences?: InferenceData[] // Array de datos de inferencias individuales
+  hasError?: boolean
+  errorCount?: number
 }
 
 interface TrackingEvent {
@@ -46,6 +49,10 @@ interface TrackingEvent {
     elementId?: string
   }
   properties?: Record<string, any>
+  metadata?: {
+    error?: string
+    success?: boolean
+  }
 }
 
 export default function DashboardPage() {
@@ -84,6 +91,18 @@ export default function DashboardPage() {
 
   // Estado para filtro de release date
   const [selectedReleaseDate, setSelectedReleaseDate] = useState<string | null>(null)
+
+  // Estado para búsqueda por placa
+  const [plateSearchQuery, setPlateSearchQuery] = useState('')
+
+  // Vista activa del menú principal
+  const [dashboardView, setDashboardView] = useState<'sessions' | 'errors'>('sessions')
+
+  // Estado para errores
+  const [totalErrors, setTotalErrors] = useState(0)
+  const [errorEvents, setErrorEvents] = useState<TrackingEvent[]>([])
+  const [errorCountBySession, setErrorCountBySession] = useState<Record<string, number>>({})
+  const [loadingErrors, setLoadingErrors] = useState(false)
 
   // Estado para el modal de timeline
   const [selectedSessionForTimeline, setSelectedSessionForTimeline] = useState<TrackingSession | null>(null)
@@ -429,10 +448,81 @@ export default function DashboardPage() {
       }
     }
 
+  const loadErrors = useCallback(async () => {
+    setLoadingErrors(true)
+    try {
+      const authData = localStorage.getItem('eva-pulse-auth')
+      const token = authData ? JSON.parse(authData).token : null
+
+      if (!token) {
+        setLoadingErrors(false)
+        return
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      }
+
+      const statsUrl = new URL('/api/tracking/stats', window.location.origin)
+      statsUrl.searchParams.set('startDate', startDateObj.toISOString())
+      statsUrl.searchParams.set('endDate', endDateObj.toISOString())
+      if (selectedUser) {
+        statsUrl.searchParams.set('appUsername', selectedUser)
+      }
+
+      const eventsUrl = new URL('/api/tracking/events', window.location.origin)
+      eventsUrl.searchParams.set('eventType', 'error')
+      eventsUrl.searchParams.set('startDate', startDateObj.toISOString())
+      eventsUrl.searchParams.set('endDate', endDateObj.toISOString())
+      if (selectedUser) {
+        eventsUrl.searchParams.set('appUsername', selectedUser)
+      }
+
+      const [statsResponse, eventsResponse] = await Promise.all([
+        fetch(statsUrl.toString(), { headers }),
+        fetch(eventsUrl.toString(), { headers }),
+      ])
+
+      const statsData = await statsResponse.json()
+      if (statsData.success && typeof statsData.data.totalErrors === 'number') {
+        setTotalErrors(statsData.data.totalErrors)
+      } else {
+        setTotalErrors(0)
+      }
+
+      const eventsData = await eventsResponse.json()
+      if (eventsData.success) {
+        const errors: TrackingEvent[] = eventsData.data.map((e: TrackingEvent) => ({
+          ...e,
+          timestamp: new Date(e.timestamp),
+        }))
+        setErrorEvents(errors)
+
+        const countMap: Record<string, number> = {}
+        errors.forEach((e) => {
+          countMap[e.sessionId] = (countMap[e.sessionId] || 0) + 1
+        })
+        setErrorCountBySession(countMap)
+      } else {
+        setErrorEvents([])
+        setErrorCountBySession({})
+      }
+    } catch (error) {
+      console.error('Error loading errors:', error)
+      setTotalErrors(0)
+      setErrorEvents([])
+      setErrorCountBySession({})
+    } finally {
+      setLoadingErrors(false)
+    }
+  }, [startDateObj, endDateObj, selectedUser])
+
   // Cargar datos cuando cambian los filtros
   useEffect(() => {
     loadData()
-  }, [startDateObj, endDateObj, selectedUser])
+    loadErrors()
+  }, [startDateObj, endDateObj, selectedUser, loadErrors])
 
   // Cargar estadísticas de inferencia cuando cambian los filtros
   useEffect(() => {
@@ -450,18 +540,106 @@ export default function DashboardPage() {
     return Array.from(releaseDatesSet).sort().reverse() // Ordenar descendente (más reciente primero)
   }, [allSessions])
 
-  // Filtrar sesiones según el rango de fechas, usuario y release date seleccionado
+  const sessionsWithErrorFlags = useMemo(() => {
+    return allSessions.map((s) => {
+      const count = errorCountBySession[s.sessionId] || 0
+      return {
+        ...s,
+        hasError: count > 0,
+        errorCount: count > 0 ? count : undefined,
+      }
+    })
+  }, [allSessions, errorCountBySession])
+
+  const plateSearchNormalized = useMemo(
+    () => (plateSearchQuery.length >= 2 ? normalizePlate(plateSearchQuery) : ''),
+    [plateSearchQuery]
+  )
+
+  // Filtrar sesiones según el rango de fechas, usuario, release date y placa
   const filteredSessions = useMemo(() => {
-    return allSessions.filter(s => {
+    return sessionsWithErrorFlags.filter((s) => {
       const sessionDate = new Date(s.startTime)
       const dateMatch = sessionDate >= startDateObj && sessionDate <= endDateObj
-      
-      const releaseDateMatch = !selectedReleaseDate || 
-        (s.deviceInfo?.releaseDate === selectedReleaseDate)
-      
-      return dateMatch && releaseDateMatch
+
+      const releaseDateMatch =
+        !selectedReleaseDate || s.deviceInfo?.releaseDate === selectedReleaseDate
+
+      const plateMatch =
+        !plateSearchNormalized ||
+        (s.inferences?.some((inf) =>
+          inf.placa ? normalizePlate(inf.placa).includes(plateSearchNormalized) : false
+        ) ?? false)
+
+      return dateMatch && releaseDateMatch && plateMatch
     })
-  }, [allSessions, startDateObj, endDateObj, selectedReleaseDate])
+  }, [
+    sessionsWithErrorFlags,
+    startDateObj,
+    endDateObj,
+    selectedReleaseDate,
+    plateSearchNormalized,
+  ])
+
+  const filteredSessionIds = useMemo(
+    () => new Set(filteredSessions.map((s) => s.sessionId)),
+    [filteredSessions]
+  )
+
+  const errorsForView = useMemo(() => {
+    let errors = errorEvents
+    if (selectedReleaseDate || plateSearchNormalized) {
+      errors = errors.filter((e) => filteredSessionIds.has(e.sessionId))
+    }
+    return errors
+  }, [errorEvents, selectedReleaseDate, plateSearchNormalized, filteredSessionIds])
+
+  const goToErrorsView = useCallback(() => {
+    setDashboardView('errors')
+    loadErrors()
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [loadErrors])
+
+  const sessionById = useMemo(() => {
+    const map = new Map<string, TrackingSession>()
+    sessionsWithErrorFlags.forEach((s) => map.set(s.sessionId, s))
+    return map
+  }, [sessionsWithErrorFlags])
+
+  const errorsGroupedBySession = useMemo(() => {
+    const bySession = new Map<string, TrackingEvent[]>()
+    errorsForView.forEach((err) => {
+      const list = bySession.get(err.sessionId) ?? []
+      list.push(err)
+      bySession.set(err.sessionId, list)
+    })
+
+    const groups = Array.from(bySession.entries()).map(([sessionId, errors]) => {
+      const sorted = [...errors].sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )
+      const session = sessionById.get(sessionId)
+      return {
+        sessionId,
+        appUsername: session?.appUsername ?? sorted[0].appUsername,
+        errorCount: sorted.length,
+        errors: sorted,
+        latestErrorAt: new Date(sorted[0].timestamp),
+        session,
+      }
+    })
+
+    return groups.sort(
+      (a, b) => b.latestErrorAt.getTime() - a.latestErrorAt.getTime()
+    )
+  }, [errorsForView, sessionById])
+
+  const totalErrorsInView = useMemo(
+    () => errorsGroupedBySession.reduce((sum, g) => sum + g.errorCount, 0),
+    [errorsGroupedBySession]
+  )
 
   // Manejar selección de usuario
   const handleUserSelect = (username: string) => {
@@ -519,6 +697,10 @@ export default function DashboardPage() {
     setSelectedReleaseDate(null)
   }
 
+  const clearPlateFilter = () => {
+    setPlateSearchQuery('')
+  }
+
   // Valores por defecto de fechas
   const defaultStartDate = useMemo(() => {
     const date = new Date()
@@ -535,11 +717,22 @@ export default function DashboardPage() {
 
   // Verificar si hay filtros activos
   const hasActiveFilters = useMemo(() => {
-    return selectedUser !== null || 
-           selectedReleaseDate !== null || 
-           startDate !== defaultStartDate || 
-           endDate !== defaultEndDate
-  }, [selectedUser, selectedReleaseDate, startDate, endDate, defaultStartDate, defaultEndDate])
+    return (
+      selectedUser !== null ||
+      selectedReleaseDate !== null ||
+      plateSearchQuery.length >= 2 ||
+      startDate !== defaultStartDate ||
+      endDate !== defaultEndDate
+    )
+  }, [
+    selectedUser,
+    selectedReleaseDate,
+    plateSearchQuery,
+    startDate,
+    endDate,
+    defaultStartDate,
+    defaultEndDate,
+  ])
 
   // Limpiar todos los filtros
   const clearAllFilters = () => {
@@ -547,6 +740,7 @@ export default function DashboardPage() {
     setSearchQuery('')
     setShowAutocomplete(false)
     setSelectedReleaseDate(null)
+    setPlateSearchQuery('')
     setStartDate(defaultStartDate)
     setEndDate(defaultEndDate)
   }
@@ -776,30 +970,47 @@ export default function DashboardPage() {
             >
               Eva Pulse
             </h1>
-            <div
+            <nav
               style={{
                 display: 'flex',
-                gap: '0.5rem',
+                gap: '0.25rem',
                 alignItems: 'center',
                 fontSize: '0.875rem',
-                color: 'var(--muted-foreground)',
               }}
+              aria-label="Secciones del dashboard"
             >
-              <Link
-                href="/dashboard"
+              <button
+                type="button"
+                onClick={() => setDashboardView('sessions')}
                 style={{
                   padding: '0.5rem 0.75rem',
                   borderRadius: '6px',
-                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
                   color: 'var(--foreground)',
-                  background: 'var(--muted)',
-                  fontWeight: 500,
+                  background:
+                    dashboardView === 'sessions' ? 'var(--muted)' : 'transparent',
+                  fontWeight: dashboardView === 'sessions' ? 600 : 500,
                   whiteSpace: 'nowrap',
                 }}
               >
-                Dashboard
-              </Link>
-            </div>
+                Sesiones
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardView('errors')}
+                className={
+                  dashboardView === 'errors' ? 'error-nav-btn error-nav-btn--active' : 'error-nav-btn'
+                }
+              >
+                Errores
+                {totalErrors > 0 && (
+                  <span className="error-count-pill">
+                    {loadingErrors ? '…' : totalErrors}
+                  </span>
+                )}
+              </button>
+            </nav>
           </div>
           <div
             style={{
@@ -1077,6 +1288,76 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Buscador de placa */}
+            <div
+              style={{
+                position: 'relative',
+                flex: '1 1 100%',
+                minWidth: '200px',
+              }}
+            >
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: 'var(--muted-foreground)',
+                  marginBottom: '0.375rem',
+                  fontWeight: 500,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Buscar Placa
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={plateSearchQuery}
+                  onChange={(e) => setPlateSearchQuery(e.target.value)}
+                  placeholder="Ej. ABC o ABC123"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    paddingRight: plateSearchQuery.length >= 2 ? '2.5rem' : '1rem',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    background: 'var(--card)',
+                    color: 'var(--foreground)',
+                    fontSize: '16px',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                    minHeight: '44px',
+                  }}
+                />
+                {plateSearchQuery.length >= 2 && (
+                  <button
+                    onClick={clearPlateFilter}
+                    type="button"
+                    style={{
+                      position: 'absolute',
+                      right: '0.5rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'var(--muted)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      width: '24px',
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: 'var(--muted-foreground)',
+                      fontSize: '0.875rem',
+                    }}
+                    title="Limpiar filtro de placa"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Selector de fechas */}
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flex: '1 1 auto', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 150px', minWidth: '150px' }}>
@@ -1309,7 +1590,7 @@ export default function DashboardPage() {
               flexWrap: 'wrap',
             }}
           >
-            {(selectedUser || selectedReleaseDate) && (
+            {(selectedUser || selectedReleaseDate || plateSearchQuery.length >= 2) && (
               <>
                 {selectedUser && (
                   <div
@@ -1327,6 +1608,24 @@ export default function DashboardPage() {
                     <span>Usuario: <strong>{selectedUser}</strong></span>
             </div>
           )}
+                {plateSearchQuery.length >= 2 && (
+                  <div
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      background: 'var(--primary)',
+                      color: 'var(--primary-foreground)',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <span>
+                      Placa: <strong>{formatPlateDisplay(plateSearchQuery)}</strong>
+                    </span>
+                  </div>
+                )}
                 {selectedReleaseDate && (
                   <div
                     style={{
@@ -1391,7 +1690,117 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Últimas sesiones en formato de cards */}
+          {dashboardView === 'errors' ? (
+            <div className="error-panel">
+              <div
+                className="error-panel__header"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                }}
+              >
+                <div>
+                  <h2
+                    style={{
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      color: 'var(--foreground)',
+                      margin: '0 0 0.25rem 0',
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    Errores del período
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: '0.8125rem',
+                      color: 'var(--muted-foreground)',
+                      margin: 0,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {errorsGroupedBySession.length}{' '}
+                    {errorsGroupedBySession.length === 1 ? 'sesión' : 'sesiones'} con{' '}
+                    {totalErrorsInView}{' '}
+                    {totalErrorsInView === 1 ? 'error' : 'errores'} · clic para ver timeline
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="error-btn-ghost"
+                    onClick={() => {
+                      loadData()
+                      loadErrors()
+                    }}
+                    disabled={loadingErrors}
+                  >
+                    {loadingErrors ? 'Actualizando…' : 'Actualizar'}
+                  </button>
+                  <CompactMetricCard
+                    title="Total"
+                    value={totalErrors}
+                    color="var(--error)"
+                  />
+                </div>
+              </div>
+              <div style={{ padding: '1rem 1.25rem' }}>
+                {loadingErrors ? (
+                  <p
+                    style={{
+                      fontSize: '0.875rem',
+                      color: 'var(--muted-foreground)',
+                      margin: 0,
+                    }}
+                  >
+                    Cargando errores...
+                  </p>
+                ) : errorsGroupedBySession.length === 0 ? (
+                  <p
+                    style={{
+                      fontSize: '0.875rem',
+                      color: 'var(--muted-foreground)',
+                      margin: 0,
+                    }}
+                  >
+                    No hay errores registrados con los filtros seleccionados.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                    {errorsGroupedBySession.map((group) => (
+                      <SessionErrorGroupCard
+                        key={group.sessionId}
+                        group={group}
+                        formatDate={formatDate}
+                        formatDuration={formatDuration}
+                        onClick={() => loadSessionForModal(group.sessionId)}
+                      />
+                    ))}
+                  </div>
+                )}
+                {!loadingErrors &&
+                  totalErrorsInView > 0 &&
+                  totalErrors > totalErrorsInView && (
+                    <p
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: 'var(--muted-foreground)',
+                        margin: '0.75rem 0 0',
+                      }}
+                    >
+                      Mostrando {totalErrorsInView} de {totalErrors} errores en{' '}
+                      {errorsGroupedBySession.length}{' '}
+                      {errorsGroupedBySession.length === 1 ? 'sesión' : 'sesiones'} (máx. 100
+                      eventos en listado)
+                    </p>
+                  )}
+              </div>
+            </div>
+          ) : (
+          /* Últimas sesiones en formato de cards */
           <div
             style={{
               background: 'var(--card)',
@@ -1430,6 +1839,11 @@ export default function DashboardPage() {
                   }}
                 >
                   {latestSessions.length} {latestSessions.length === 1 ? 'sesión' : 'sesiones'} en el rango seleccionado
+                    {!loadingErrors && totalErrors > 0 && (
+                      <span style={{ marginLeft: '0.75rem', color: 'var(--error-text)' }}>
+                        · {totalErrors} {totalErrors === 1 ? 'error' : 'errores'}
+                      </span>
+                    )}
                     {lastUpdate && (
                       <span style={{ marginLeft: '0.75rem' }}>
                         • Actualizado {timeAgo}
@@ -1439,8 +1853,11 @@ export default function DashboardPage() {
               </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <button
-                  onClick={loadData}
-                  disabled={loading}
+                  onClick={() => {
+                    loadData()
+                    loadErrors()
+                  }}
+                  disabled={loading || loadingErrors}
                   style={{
                     padding: '0.625rem 1rem',
                     minHeight: '44px',
@@ -1514,6 +1931,19 @@ export default function DashboardPage() {
                   title="Usuarios"
                   value={uniqueUsers}
                   color="var(--primary)"
+                />
+                <CompactMetricCard
+                  title="Errores"
+                  value={loadingErrors ? 0 : totalErrors}
+                  color="var(--error)"
+                  clickable
+                  onClick={goToErrorsView}
+                  loading={loadingErrors}
+                  titleAttr={
+                    totalErrors > 0
+                      ? 'Ver errores del rango de fechas'
+                      : 'Sin errores en el rango'
+                  }
                 />
                 {inferenceStats && (
                   <>
@@ -1785,6 +2215,7 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {/* Modal de Timeline */}
@@ -1949,18 +2380,46 @@ function MinimalStatCard({
   )
 }
 
-function CompactMetricCard({ title, value, color }: {
+function CompactMetricCard({
+  title,
+  value,
+  color,
+  clickable,
+  onClick,
+  loading,
+  titleAttr,
+}: {
   title: string
   value: number
   color: string
+  clickable?: boolean
+  onClick?: () => void
+  loading?: boolean
+  titleAttr?: string
 }) {
+  const isErrorMetric = color === 'var(--error)'
+
   return (
     <div
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      title={titleAttr}
+      onClick={clickable && onClick ? onClick : undefined}
+      onKeyDown={
+        clickable && onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick()
+              }
+            }
+          : undefined
+      }
       style={{
         padding: '0.5rem 0.75rem',
         background: 'var(--card)',
         borderRadius: '6px',
-        border: '1px solid var(--border)',
+        border: `1px solid ${isErrorMetric ? 'var(--error-border)' : 'var(--border)'}`,
         boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
         minWidth: '70px',
         maxWidth: '100px',
@@ -1968,6 +2427,21 @@ function CompactMetricCard({ title, value, color }: {
         display: 'flex',
         flexDirection: 'column',
         gap: '0.25rem',
+        cursor: clickable ? 'pointer' : 'default',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease',
+        opacity: loading ? 0.65 : 1,
+      }}
+      onMouseEnter={(e) => {
+        if (!clickable) return
+        e.currentTarget.style.borderColor = isErrorMetric ? 'var(--error)' : 'var(--primary)'
+        e.currentTarget.style.boxShadow = isErrorMetric
+          ? '0 2px 8px var(--error-subtle)'
+          : '0 2px 8px rgba(0,0,0,0.06)'
+      }}
+      onMouseLeave={(e) => {
+        if (!clickable) return
+        e.currentTarget.style.borderColor = isErrorMetric ? 'var(--error-border)' : 'var(--border)'
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)'
       }}
     >
       <div
@@ -1992,7 +2466,7 @@ function CompactMetricCard({ title, value, color }: {
           textAlign: 'center',
         }}
       >
-        {value.toLocaleString()}
+        {loading ? '…' : value.toLocaleString()}
       </div>
     </div>
   )
@@ -2029,7 +2503,8 @@ function CompactTimeStatCard({
     }
   }
 
-  const isDestructive = color === 'var(--destructive)' || isNegative
+  const isDestructive =
+    color === 'var(--destructive)' || color === 'var(--error)' || isNegative
   
   return (
     <div
@@ -2321,7 +2796,7 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
       interaction: '#10b981',
       event: '#f59e0b',
       navigation: '#2563eb',
-      error: 'var(--destructive)'
+      error: 'var(--error)'
     }
     return colors[eventType] || 'var(--muted-foreground)'
   }
@@ -2676,177 +3151,115 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
                 No hay eventos en esta sesión
               </div>
             ) : (
-              <div style={{ position: 'relative', paddingLeft: 'clamp(2.5rem, 5vw, 3rem)' }}>
-                {/* Línea vertical - responsive */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 'clamp(19px, 4vw, 24px)',
-                    top: '0',
-                    bottom: '0',
-                    width: '2px',
-                    background: 'linear-gradient(180deg, rgba(102, 126, 234, 0.3) 0%, var(--primary) 100%)',
-                    borderRadius: '2px',
-                    zIndex: 1,
-                  }}
-                />
-
-                {/* Grupos de eventos por sub-sesión */}
+              <div className="timeline-rail">
                 {groupedEvents.map((group, groupIndex) => {
-                  const showNewSessionHeader = group.authEvent && isLoginEventCheck(group.authEvent)
+                  const showNewSessionHeader =
+                    group.authEvent && isLoginEventCheck(group.authEvent)
 
                   return (
                     <div key={groupIndex}>
-                      {/* Separador de sub-sesión solo si hay evento de login (no logout) */}
                       {showNewSessionHeader && (
                         <div
+                          className={groupIndex > 0 ? 'timeline-session-divider' : undefined}
                           style={{
-                            position: 'relative',
-                            marginBottom: '1.5rem',
-                            marginTop: groupIndex > 0 ? '2rem' : '0',
-                            paddingTop: groupIndex > 0 ? '1.5rem' : '0',
-                            borderTop: groupIndex > 0 ? '2px solid var(--border)' : 'none',
+                            marginBottom: '1rem',
+                            paddingLeft: 'calc(var(--timeline-rail-width) + 0.75rem)',
                           }}
                         >
-                          {/* Línea horizontal separadora */}
-                          {groupIndex > 0 && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                left: '-3rem',
-                                top: '-2px',
-                                width: '3rem',
-                                height: '2px',
-                                background: 'var(--border)',
-                              }}
-                            />
-                          )}
-                          {/* Encabezado de sub-sesión */}
                           <div
                             style={{
-                              marginBottom: '1rem',
-                              paddingLeft: '1.5rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              color: 'var(--muted-foreground)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '0.5rem',
                             }}
                           >
-                            <div
-                              style={{
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                color: 'var(--muted-foreground)',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '0.5rem',
-                              }}
-                            >
-                              Nueva Sesión
-                            </div>
-                            <div
-                              style={{
-                                fontSize: '0.875rem',
-                                color: 'var(--foreground)',
-                                fontWeight: 500,
-                              }}
-                            >
-                              {formatSessionDate(group.authEvent!.timestamp)}
-                            </div>
+                            Nueva Sesión
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.875rem',
+                              color: 'var(--foreground)',
+                              fontWeight: 500,
+                            }}
+                          >
+                            {formatSessionDate(group.authEvent!.timestamp)}
                           </div>
                         </div>
                       )}
 
-                    {/* Eventos del grupo */}
-                    {group.events.map((event) => {
-                      const isSelected = selectedEventId === event.eventId
-                      const isHovered = hoveredEventId === event.eventId
-                      const eventColor = getEventTypeColor(event.eventType)
-                      const pointSize = isSelected || isHovered ? 16 : 12
+                      {group.events.map((event) => {
+                        const isSelected = selectedEventId === event.eventId
+                        const isHovered = hoveredEventId === event.eventId
+                        const isActive = isSelected || isHovered
+                        const eventColor = getEventTypeColor(event.eventType)
 
-                      return (
-                        <div
-                          key={event.eventId}
-                          style={{
-                            position: 'relative',
-                            marginBottom: '1rem',
-                            paddingLeft: '1.5rem',
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => setSelectedEventId(event.eventId)}
-                          onMouseEnter={() => setHoveredEventId(event.eventId)}
-                          onMouseLeave={() => setHoveredEventId(null)}
-                        >
-                          {/* Punto directamente centrado en la línea */}
+                        return (
                           <div
-                            style={{
-                              position: 'absolute',
-                              left: '-20px', // Aproximado para centrar en la línea (responsive con padding)
-                              top: '2px',
-                              width: `${pointSize}px`,
-                              height: `${pointSize}px`,
-                              marginLeft: `-${pointSize / 2}px`, // Centrar el punto
-                              borderRadius: '50%',
-                              background: eventColor,
-                              border: '3px solid var(--background)',
-                              boxShadow: isSelected || isHovered
-                                ? `0 0 0 6px ${eventColor}40, 0 0 0 10px ${eventColor}20, 0 4px 12px ${eventColor}60`
-                                : `0 0 0 3px ${eventColor}40, 0 0 0 6px ${eventColor}20, 0 2px 6px ${eventColor}40`,
-                              transition: 'all 0.2s ease',
-                              boxSizing: 'border-box',
-                              zIndex: 10,
-                            }}
-                          />
-
-                          {/* Hora y nombre del evento */}
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              paddingTop: '0.1em',
-                              marginLeft: '-0.5rem',
-                            }}
+                            key={event.eventId}
+                            className="timeline-row"
+                            onClick={() => setSelectedEventId(event.eventId)}
+                            onMouseEnter={() => setHoveredEventId(event.eventId)}
+                            onMouseLeave={() => setHoveredEventId(null)}
                           >
                             <div
+                              className={
+                                isActive ? 'timeline-node timeline-node--active' : 'timeline-node'
+                              }
                               style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.375rem',
-                                fontSize: '0.75rem',
-                                color: isSelected ? eventColor : 'var(--muted-foreground)',
-                                fontWeight: isSelected ? 600 : 500,
-                                minWidth: '85px',
-                                transition: 'all 0.2s ease',
+                                background: eventColor,
+                                boxShadow: isActive
+                                  ? `0 0 0 4px color-mix(in srgb, ${eventColor} 25%, transparent), 0 0 0 8px color-mix(in srgb, ${eventColor} 12%, transparent)`
+                                  : `0 0 0 2px color-mix(in srgb, ${eventColor} 30%, transparent)`,
                               }}
-                            >
-                              <span 
-                                style={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  opacity: isSelected ? 1 : 0.8,
-                                  transition: 'opacity 0.2s ease',
+                            />
+                            <div className="timeline-row-content">
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.375rem',
+                                  fontSize: '0.75rem',
+                                  color: isSelected ? eventColor : 'var(--muted-foreground)',
+                                  fontWeight: isSelected ? 600 : 500,
+                                  minWidth: '85px',
+                                  transition: 'color 0.2s ease',
                                 }}
                               >
-                                {getEventTypeIcon(event.eventType)}
-                              </span>
-                              {new Date(event.timestamp).toLocaleTimeString('es-ES', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit',
-                              })}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: '0.9375rem',
-                                fontWeight: isSelected ? 600 : 500,
-                                color: isSelected ? 'var(--foreground)' : 'var(--muted-foreground)',
-                                transition: 'all 0.2s ease',
-                              }}
-                            >
-                              {event.eventName.replace(/_/g, ' ')}
+                                <span
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    opacity: isSelected ? 1 : 0.8,
+                                  }}
+                                >
+                                  {getEventTypeIcon(event.eventType)}
+                                </span>
+                                {new Date(event.timestamp).toLocaleTimeString('es-ES', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                })}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: '0.9375rem',
+                                  fontWeight: isSelected ? 600 : 500,
+                                  color: isSelected
+                                    ? 'var(--foreground)'
+                                    : 'var(--muted-foreground)',
+                                  transition: 'color 0.2s ease',
+                                }}
+                              >
+                                {event.eventName.replace(/_/g, ' ')}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                        )
+                      })}
+                    </div>
                   )
                 })}
               </div>
@@ -3145,90 +3558,376 @@ function TimelineModal({ session, onClose, formatDate, formatDuration }: {
   )
 }
 
+function formatInferenceTime(ms: number): string {
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`
+  }
+  if (ms < 60000) {
+    return `${(ms / 1000).toFixed(1)}s`
+  }
+  const minutes = Math.floor(ms / 60000)
+  const seconds = ((ms % 60000) / 1000).toFixed(1)
+  return `${minutes}m ${seconds}s`
+}
+
+function extractPlacaFromProperties(
+  properties?: Record<string, unknown>
+): string | undefined {
+  if (!properties) return undefined
+  const raw =
+    properties.placa ?? properties.plate ?? properties.licensePlate
+  return raw != null ? String(raw) : undefined
+}
+
+function getUniquePlacas(
+  session?: TrackingSession,
+  ...propertySources: (Record<string, unknown> | undefined)[]
+): string[] {
+  const seen = new Set<string>()
+  const add = (raw?: string) => {
+    if (!raw) return
+    const n = normalizePlate(raw)
+    if (n) seen.add(n)
+  }
+  propertySources.forEach((props) => add(extractPlacaFromProperties(props)))
+  session?.inferences?.forEach((inf) => add(inf.placa))
+  return Array.from(seen)
+}
+
+function getPlatformInfo(platform: string) {
+  const platformLower = platform.toLowerCase()
+  if (platformLower.includes('android')) {
+    return {
+      name: 'Android',
+      icon: (
+        <img
+          src="https://img.icons8.com/fluency/48/android-os.png"
+          alt="Android"
+          width="16"
+          height="16"
+          style={{
+            display: 'inline-block',
+            verticalAlign: 'middle',
+            filter: 'grayscale(100%) brightness(0.3)',
+            opacity: 1,
+          }}
+        />
+      ),
+    }
+  }
+  if (
+    platformLower.includes('ios') ||
+    platformLower.includes('iphone') ||
+    platformLower.includes('ipad')
+  ) {
+    return {
+      name: 'iOS',
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+        </svg>
+      ),
+    }
+  }
+  return {
+    name: platform || 'Unknown',
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+      </svg>
+    ),
+  }
+}
+
+function SessionErrorGroupCard({
+  group,
+  formatDate,
+  formatDuration,
+  onClick,
+}: {
+  group: {
+    sessionId: string
+    appUsername: string
+    errorCount: number
+    errors: TrackingEvent[]
+    latestErrorAt: Date
+    session?: TrackingSession
+  }
+  formatDate: (date: Date) => string
+  formatDuration: (seconds: number) => string
+  onClick: () => void
+}) {
+  const { session, errors, errorCount, appUsername } = group
+  const platformInfo = getPlatformInfo(session?.deviceInfo?.platform || '')
+  const placas = getUniquePlacas(
+    session,
+    ...errors.map((e) => e.properties)
+  )
+  const latestError = errors[0]
+  const lastMessage =
+    latestError.metadata?.error ||
+    latestError.properties?.errorCode ||
+    latestError.properties?.message ||
+    null
+  const errorTypes = [
+    ...new Set(errors.map((e) => e.eventName.replace(/_/g, ' '))),
+  ].slice(0, 3)
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className="error-card"
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: '220px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.625rem',
+              marginBottom: '0.5rem',
+            }}
+          >
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '8px',
+                border: '1px solid var(--error-border)',
+                background: 'var(--error-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--error-text)',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                flexShrink: 0,
+              }}
+            >
+              {appUsername.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                  marginBottom: '0.125rem',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: 'var(--foreground)',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {appUsername}
+                </span>
+                <span
+                  className="error-badge"
+                  style={{
+                    background: 'var(--error)',
+                    color: 'var(--error-foreground)',
+                    borderColor: 'var(--error)',
+                  }}
+                >
+                  {errorCount} {errorCount === 1 ? 'error' : 'errores'}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontSize: '0.8125rem',
+                  color: 'var(--muted-foreground)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                {session ? (
+                  <>
+                    <span>Sesión: {formatDate(session.startTime)}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      {platformInfo.icon}
+                      <span>{platformInfo.name}</span>
+                    </span>
+                  </>
+                ) : (
+                  <span>Sesión: {group.sessionId.slice(0, 12)}…</span>
+                )}
+                <span>· Último: {formatDate(group.latestErrorAt)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+              marginBottom: lastMessage || errorTypes.length > 0 ? '0.5rem' : 0,
+            }}
+          >
+            {session && session.duration > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.8125rem',
+                  color: 'var(--muted-foreground)',
+                }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ opacity: 0.7 }}
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>{formatDuration(session.duration)}</span>
+              </div>
+            )}
+            {session?.deviceInfo?.releaseDate && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.625rem',
+                  background: 'var(--muted)',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  color: 'var(--foreground)',
+                }}
+              >
+                <span style={{ fontSize: '0.6875rem', fontWeight: 500, opacity: 0.8 }}>
+                  Release:
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                  {session.deviceInfo.releaseDate}
+                </span>
+              </div>
+            )}
+            {errorTypes.length > 0 && (
+              <div
+                style={{
+                  fontSize: '0.8125rem',
+                  color: 'var(--muted-foreground)',
+                }}
+              >
+                {errorTypes.join(' · ')}
+                {errors.length > errorTypes.length
+                  ? ` · +${errors.length - errorTypes.length} más`
+                  : ''}
+              </div>
+            )}
+          </div>
+
+          {lastMessage && (
+            <div
+              style={{
+                fontSize: '0.8125rem',
+                color: 'var(--error-text)',
+                lineHeight: 1.45,
+                paddingLeft: '0.5rem',
+                borderLeft: '2px solid var(--error-border)',
+              }}
+            >
+              {String(lastMessage)}
+            </div>
+          )}
+        </div>
+
+        {placas.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.375rem',
+              justifyContent: 'flex-end',
+              alignItems: 'flex-start',
+            }}
+          >
+            {placas.map((placa) => (
+              <span key={placa} className="plate-chip plate-chip--classic">
+                {formatPlateDisplay(placa)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SessionCard({ session, formatDate, formatDuration, onClick }: {
   session: TrackingSession
   formatDate: (date: Date) => string
   formatDuration: (seconds: number) => string
   onClick: () => void
 }) {
-  // Función para formatear tiempo de inferencia
-  const formatInferenceTime = (ms: number): string => {
-    if (ms < 1000) {
-      return `${Math.round(ms)}ms`
-    } else if (ms < 60000) {
-      return `${(ms / 1000).toFixed(1)}s`
-    } else {
-      const minutes = Math.floor(ms / 60000)
-      const seconds = ((ms % 60000) / 1000).toFixed(1)
-      return `${minutes}m ${seconds}s`
-    }
-  }
-  // Función para obtener el icono y nombre del SO
-  const getPlatformInfo = (platform: string) => {
-    const platformLower = platform.toLowerCase()
-    if (platformLower.includes('android')) {
-      return {
-        name: 'Android',
-        icon: (
-          <img 
-            src="https://img.icons8.com/fluency/48/android-os.png" 
-            alt="Android" 
-            width="16" 
-            height="16"
-            style={{ 
-              display: 'inline-block', 
-              verticalAlign: 'middle',
-              filter: 'grayscale(100%) brightness(0.3)',
-              opacity: 1
-            }}
-          />
-        )
-      }
-    } else if (platformLower.includes('ios') || platformLower.includes('iphone') || platformLower.includes('ipad')) {
-      return {
-        name: 'iOS',
-        icon: (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            {/* Logo oficial de Apple/iOS - SVG oficial */}
-            <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-          </svg>
-        )
-      }
-    } else {
-      return {
-        name: platform || 'Unknown',
-        icon: (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-            <line x1="8" y1="21" x2="16" y2="21"/>
-            <line x1="12" y1="17" x2="12" y2="21"/>
-          </svg>
-        )
-      }
-    }
-  }
-
   const platformInfo = getPlatformInfo(session.deviceInfo?.platform || '')
+  const hasError = session.hasError === true
 
   return (
     <div
+      className={hasError ? 'error-session-card' : undefined}
       style={{
         padding: '1rem 1.25rem',
         background: 'var(--background)',
-        borderRadius: '8px',
+        borderRadius: '10px',
         border: '1px solid var(--border)',
-        transition: 'all 0.2s',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
         cursor: 'pointer',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--primary)'
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'
-        e.currentTarget.style.transform = 'translateY(-1px)'
+        e.currentTarget.style.borderColor = hasError ? 'var(--error-border)' : 'var(--primary)'
+        e.currentTarget.style.boxShadow = hasError
+          ? '0 4px 12px var(--error-subtle)'
+          : '0 2px 8px rgba(0,0,0,0.06)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = 'var(--border)'
         e.currentTarget.style.boxShadow = 'none'
-        e.currentTarget.style.transform = 'translateY(0)'
       }}
       onClick={onClick}
     >
@@ -3277,6 +3976,22 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
               >
                 {session.appUsername}
               </div>
+              {hasError && (
+                <span className="error-session-flag" style={{ marginTop: '0.25rem' }}>
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: 'var(--error)',
+                      flexShrink: 0,
+                    }}
+                  />
+                  {(session.errorCount ?? 0) > 1
+                    ? `${session.errorCount} errores`
+                    : 'Error'}
+                </span>
+              )}
               <div
                 style={{
                   fontSize: '0.8125rem',
@@ -3442,32 +4157,10 @@ function SessionCard({ session, formatDate, formatDuration, onClick }: {
                   </span>
                 </div>
                 {inference.placa && (() => {
-                  // Formatear placa estilo Colombia (ABC-123 o ABC-ABC)
-                  const placaFormateada = (() => {
-                    const placa = String(inference.placa).toUpperCase().replace(/[^A-Z0-9]/g, '')
-                    if (placa.length >= 6) {
-                      return `${placa.substring(0, 3)}-${placa.substring(3, 6)}`
-                    }
-                    return placa
-                  })()
-                  
+                  const placaFormateada = formatPlateDisplay(String(inference.placa))
+
                   return (
-                    <div
-                      style={{
-                        fontSize: '0.6875rem',
-                        fontWeight: 700,
-                        color: '#000',
-                        letterSpacing: '0.4px',
-                        textTransform: 'uppercase',
-                        background: '#FFD700',
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '4px',
-                        border: '1px solid #FFA500',
-                        fontFamily: 'monospace',
-                      }}
-                    >
-                      {placaFormateada}
-                    </div>
+                    <span className="plate-chip plate-chip--classic">{placaFormateada}</span>
                   )
                 })()}
               </div>

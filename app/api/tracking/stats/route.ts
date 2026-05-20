@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth, unauthorizedResponse } from '@/lib/middleware/auth'
-import { getUniqueUsers, getTotalSessions, getTotalEvents, getSessionsByDateRange, getSessionsByUser } from '@/lib/services/trackingService'
+import {
+  getUniqueUsers,
+  getTotalSessions,
+  getTotalEvents,
+  getSessionsByDateRange,
+  getSessionsByUser,
+  countErrorsByDateRange,
+} from '@/lib/services/trackingService'
 
 export async function GET(request: NextRequest) {
   // Verificar autenticación
@@ -27,6 +34,11 @@ export async function GET(request: NextRequest) {
         : sessions
       
       const uniqueUsersSet = new Set(filteredSessions.map(s => s.appUsername))
+      const totalErrors = await countErrorsByDateRange(
+        new Date(startDate),
+        new Date(endDate),
+        appUsername || undefined
+      )
 
       return NextResponse.json({
         success: true,
@@ -34,6 +46,7 @@ export async function GET(request: NextRequest) {
           uniqueUsers: uniqueUsersSet.size,
           totalSessions: filteredSessions.length,
           totalEvents: filteredSessions.reduce((sum, s) => sum + s.eventCount, 0),
+          totalErrors,
         },
       })
     }
