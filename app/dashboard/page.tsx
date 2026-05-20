@@ -2025,32 +2025,10 @@ export default function DashboardPage() {
                   }}
                 >
                   <button
+                    type="button"
+                    className="pagination-nav-btn"
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: currentPage === 1 ? 'var(--muted)' : 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      color: currentPage === 1 ? 'var(--muted-foreground)' : 'var(--foreground)',
-                      cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      transition: 'all 0.2s',
-                      opacity: currentPage === 1 ? 0.5 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentPage !== 1) {
-                        e.currentTarget.style.background = 'var(--accent)'
-                        e.currentTarget.style.borderColor = 'var(--primary)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentPage !== 1) {
-                        e.currentTarget.style.background = 'var(--card)'
-                        e.currentTarget.style.borderColor = 'var(--border)'
-                      }
-                    }}
                   >
                     Anterior
                   </button>
@@ -2076,33 +2054,14 @@ export default function DashboardPage() {
                       
                       return (
                         <button
+                          type="button"
                           key={pageNum}
+                          className={
+                            currentPage === pageNum
+                              ? 'pagination-page-btn pagination-page-btn--active'
+                              : 'pagination-page-btn'
+                          }
                           onClick={() => setCurrentPage(pageNum)}
-                          style={{
-                            minWidth: '2.5rem',
-                            height: '2.5rem',
-                            padding: '0.5rem',
-                            background: currentPage === pageNum ? 'var(--primary)' : 'var(--card)',
-                            border: `1px solid ${currentPage === pageNum ? 'var(--primary)' : 'var(--border)'}`,
-                            borderRadius: '6px',
-                            color: currentPage === pageNum ? 'white' : 'var(--foreground)',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: currentPage === pageNum ? 600 : 500,
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (currentPage !== pageNum) {
-                              e.currentTarget.style.background = 'var(--accent)'
-                              e.currentTarget.style.borderColor = 'var(--primary)'
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (currentPage !== pageNum) {
-                              e.currentTarget.style.background = 'var(--card)'
-                              e.currentTarget.style.borderColor = 'var(--border)'
-                            }
-                          }}
                         >
                           {pageNum}
                         </button>
@@ -2111,43 +2070,15 @@ export default function DashboardPage() {
                   </div>
                   
                   <button
+                    type="button"
+                    className="pagination-nav-btn"
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: currentPage === totalPages ? 'var(--muted)' : 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      color: currentPage === totalPages ? 'var(--muted-foreground)' : 'var(--foreground)',
-                      cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      transition: 'all 0.2s',
-                      opacity: currentPage === totalPages ? 0.5 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (currentPage !== totalPages) {
-                        e.currentTarget.style.background = 'var(--accent)'
-                        e.currentTarget.style.borderColor = 'var(--primary)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (currentPage !== totalPages) {
-                        e.currentTarget.style.background = 'var(--card)'
-                        e.currentTarget.style.borderColor = 'var(--border)'
-                      }
-                    }}
                   >
                     Siguiente
                   </button>
-                  
-                  <div
-                    style={{
-                      fontSize: '0.875rem',
-                      color: 'var(--muted-foreground)',
-                      marginLeft: '1rem',
-                    }}
-                  >
+
+                  <div className="pagination-meta">
                     Página {currentPage} de {totalPages}
                   </div>
                 </div>

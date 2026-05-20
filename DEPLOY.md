@@ -83,7 +83,7 @@ npm ci || npm install
 
 ```bash
 cd /home/ubuntu/apps/eva-pulse
-mkdir -p logs
+mkdir -p "$HOME/logs/eva-pulse"
 npm run build
 ```
 
@@ -99,7 +99,7 @@ Instalación global:
 sudo npm install -g pm2
 ```
 
-`ecosystem.config.js` debe apuntar al directorio real del repo (`cwd: path.join(__dirname)`), ejecutar `next start` solo en **127.0.0.1:3222** (Nginx termina TLS y hace proxy), y `NODE_ENV=production`.
+`ecosystem.config.js` debe apuntar al directorio real del repo (`cwd: path.join(__dirname)`), ejecutar `next start` solo en **127.0.0.1:3222** (Nginx termina TLS y hace proxy), y `NODE_ENV=production`. Los ficheros de log de PM2 están en **`$HOME/logs/eva-pulse/`** (`pm2-out.log`, `pm2-error.log`), fuera del directorio del proyecto.
 
 ```bash
 cd /home/ubuntu/apps/eva-pulse

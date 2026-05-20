@@ -310,6 +310,71 @@ html.dark .error-card:hover {
   border: 1px solid #ffa500;
 }
 
+/* Paginación — contraste en claro y oscuro */
+.pagination-nav-btn {
+  padding: 0.5rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pagination-nav-btn:hover:not(:disabled) {
+  background: var(--muted);
+  border-color: var(--primary);
+}
+
+.pagination-nav-btn:disabled {
+  background: var(--muted);
+  border-color: var(--border);
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.pagination-page-btn {
+  min-width: 2.5rem;
+  height: 2.5rem;
+  padding: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pagination-page-btn:hover {
+  background: var(--muted);
+  border-color: var(--primary);
+}
+
+.pagination-page-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+
+.pagination-page-btn--active:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.pagination-meta {
+  font-size: 0.875rem;
+  color: var(--foreground);
+  opacity: 0.75;
+  margin-left: 1rem;
+}
+
 /* Timeline modal — eje vertical alineado */
 .timeline-rail {
   position: relative;
