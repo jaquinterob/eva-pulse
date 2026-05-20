@@ -46,6 +46,12 @@ sudo docker compose up -d
 
 ## 3. Variables de entorno (`.env`)
 
+Plantilla versionada: **`.env.example`**. Copiar y completar:
+
+```bash
+cp .env.example .env
+```
+
 En la raíz del proyecto, archivo **`.env`** (no commitear; ya está en `.gitignore`):
 
 ```env

@@ -38,12 +38,18 @@ eva-pulse/
 npm install
 ```
 
-2. Ejecutar en modo desarrollo:
+2. Configurar variables de entorno:
+```bash
+cp .env.example .env
+# Editar .env con valores reales (no commitear)
+```
+
+3. Ejecutar en modo desarrollo:
 ```bash
 npm run dev
 ```
 
-3. Abrir [http://localhost:3000](http://localhost:3000) en el navegador
+4. Abrir [http://localhost:3000](http://localhost:3000) en el navegador
 
 ## 📝 Scripts Disponibles
 
